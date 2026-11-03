@@ -54,6 +54,7 @@ export function koloni() {
     weather,
     weatherName: HAVA[weather],
     night: hour < 6 || hour >= 20,
+    hour,
     bees,
     cells,
     honeyKg: (s.stats.honey / 150).toFixed(1),

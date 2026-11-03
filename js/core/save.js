@@ -18,6 +18,9 @@ const blank = () => ({
   petek: { stars: [] },
   stats: { words: 0, honey: 0, hints: 0, clues: 0, longest: '', extras: 0 },
   found: [],
+  garden: [],
+  spent: 0,
+  sonsuz: { best: 0, runs: 0, words: 0, wave: 0 },
   jar: 30,
   hintAt: 0,
   clueAt: 0,
@@ -34,6 +37,8 @@ function merge(s) {
     petek: { ...b.petek, ...(s.petek || {}) },
     stats: { ...b.stats, ...(s.stats || {}) },
     lb: { ...b.lb, ...(s.lb || {}) },
+    sonsuz: { ...b.sonsuz, ...(s.sonsuz || {}) },
+    garden: Array.isArray(s.garden) ? s.garden : [],
     found: Array.isArray(s.found) ? s.found : [],
   };
 }

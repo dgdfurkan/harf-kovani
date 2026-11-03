@@ -11,6 +11,7 @@ import { combBadge } from './koloni/sahne.js';
 import { introStory } from './koloni/hikaye.js';
 import { mountHome } from './sayfa/ana.js';
 import { mountLevels, mountBook, mountBoard, mountSettings, mountStory, applyTheme } from './sayfa/sayfalar.js';
+import { mountGarden } from './sayfa/bahce.js';
 import { playCicek, CICEK_LEVELS } from './oyun/cicek.js';
 import { playPetek, PETEK_LEVELS } from './oyun/petek.js';
 import { PUZZLES } from './data/kovan-levels.js';
@@ -107,7 +108,18 @@ async function route() {
     teardown();
     perf.reset();
     document.body.dataset.page = a || 'ana';
-    if (a === 'oyna' && (b === 'cicek' || b === 'petek')) {
+    if (a === 'oyna' && b === 'sonsuz') {
+      const f = gameFrame('Sonsuz Petek');
+      const nav = {
+        setTitle: f.setTitle,
+        setBack: (fn) => { f.back = fn; },
+        toList: () => go(''),
+        toLevel: () => route(),
+        toHome: () => go(''),
+      };
+      setMusic('zor');
+      current = playPetek(f.main, nav, 0, { endless: true });
+    } else if (a === 'oyna' && (b === 'cicek' || b === 'petek')) {
       const total = b === 'cicek' ? CICEK_LEVELS : PETEK_LEVELS;
       const li = Math.max(0, Math.min(total - 1, Number(c) || 0));
       const f = gameFrame('');
@@ -136,6 +148,9 @@ async function route() {
       setMusic('ev');
     } else if (a === 'ayarlar') {
       current = mountSettings(app, go);
+      setMusic('ev');
+    } else if (a === 'bahce') {
+      current = mountGarden(app, go);
       setMusic('ev');
     } else if (a === 'hikaye') {
       current = mountStory(app, go);

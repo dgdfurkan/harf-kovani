@@ -7,10 +7,17 @@ import { submitScore } from '../core/dreamlo.js';
 import { koloni, growthLine, pendingChapter } from '../koloni/koloni.js';
 import { combBadge } from '../koloni/sahne.js';
 import { chapterSheet } from '../koloni/hikaye.js';
+import { bonus } from '../koloni/bahce.js';
 import { noteSheet } from './notlar.js';
 
 export function levelDone({ mode, li, total, stars, honey, stats, longest, hard, onNext, onList, onHome }) {
   const before = koloni();
+  // Bahçede açan çiçekler bala bereket katar
+  const bon = bonus(before);
+  if (bon > 0) {
+    honey = Math.round(honey * (1 + bon));
+    stats = [...stats, ['Bahçe bereketi', `%${Math.round(bon * 100)}`]];
+  }
   const list = save.data[mode].stars;
   if (stars > (list[li] || 0)) list[li] = stars;
   const st = save.data.stats;

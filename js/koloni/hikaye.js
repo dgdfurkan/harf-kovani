@@ -5,7 +5,8 @@ import { save } from '../core/save.js';
 import { sfx, buzz } from '../core/audio.js';
 import { openSheet, icon } from '../core/ui.js';
 import { koloni, chapterFor, markChapter, NAMES } from './koloni.js';
-import { sceneSVG } from './sahne.js';
+import { sceneData } from './sahne.js';
+import { liveScene } from './canli.js';
 
 const INK = '#2a1636';
 const miniBee = (x, y, s, cls = '') => `<g class="${cls}" transform="translate(${x} ${y}) scale(${s})"><ellipse class="sb-wing" cx="-1" cy="-5" rx="4.5" ry="2.6" fill="#fff" opacity=".9"/><ellipse cx="0" cy="0" rx="5.4" ry="3.8" fill="#ffcd3c" stroke="${INK}" stroke-width="1.3"/><path d="M-1 -3.6v7.2M2.4 -3.2v6.4" stroke="${INK}" stroke-width="1.5"/><circle cx="-4.6" cy="-.6" r="1.6" fill="${INK}"/></g>`;
@@ -101,9 +102,11 @@ export function chapterSheet(ch, after) {
   const [season, weather] = ART_SEASON[ch.art];
   const view = { ...k, season, weather, night: false, bloom: { bahar: 1, yaz: 0.8, guz: 0.25, kis: 0 }[season] };
   markChapter(ch.index);
-  openSheet(html`
+  const sd = sceneData(view);
+  let live = null;
+  const { el: sheet } = openSheet(html`
     <div class="chap">
-      <div class="chap-art">${raw(sceneSVG(view))}</div>
+      <div class="chap-art">${raw(sd.svg)}</div>
       <small>${k.name} Kovanı · ${ch.index * 10}. bölüm</small>
       <h2>${ch.t}</h2>
       <p>${ch.d(k)}</p>
@@ -111,8 +114,9 @@ export function chapterSheet(ch, after) {
     <button class="btn btn-main btn-big" data-act="ok">${icon('arrow')}Devam</button>`, {
     cls: 'sheet-chap',
     actions: { ok: (close) => close() },
-    onClose: () => after && after(),
+    onClose: () => { if (live) live.dispose(); if (after) after(); },
   });
+  live = liveScene(sheet.querySelector('.chap-art'), view, sd);
   sfx.chime(84);
 }
 

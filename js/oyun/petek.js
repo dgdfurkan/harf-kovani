@@ -1,4 +1,5 @@
-// Petek Avı: 19 gözlü kovanda komşu harfleri birleştir, kelime çıkar. Hamle yok, bölüm hedefi var.
+// Petek Avı: 19 gözlü kovanda komşu harfleri birleştir, kelime çıkar. İki sürüm: bölüm bölüm
+// hedefli oyun ve Sonsuz Petek (nektar bitene kadar puan topla, her 8 kelimede yeni dalga).
 // Tahta rastgele harflerle değil tanıdık kelimelerle kurulur: sözlükten seçilen kelimeler komşu
 // gözlere yerleşir, bulunan kelimenin yerine gelen harfler de yeni kelimeler çıkacak şekilde seçilir.
 
@@ -6,7 +7,10 @@ import { Life, html, toHTML, fitCanvas, clamp, lerp, rand, pick, trUpper, shuffl
 import { save } from '../core/save.js';
 import { sfx, buzz, tone } from '../core/audio.js';
 import { makeFx, rrect, label, shake } from '../core/fx.js';
-import { pauseSheet, toast, icon } from '../core/ui.js';
+import { pauseSheet, resultSheet, toast, icon } from '../core/ui.js';
+import { submitScore } from '../core/dreamlo.js';
+import { koloni, fmt } from '../koloni/koloni.js';
+import { bonus } from '../koloni/bahce.js';
 import { SOZLUK } from '../data/kovan-sozluk.js';
 import { INK, loadLists, letterLink, drawRope, drawBee, drawJar, drawPill, hexPath, combBackdrop, themeColors } from './bag.js';
 import { helpBarHTML, helpBar, jarGain } from './yardim.js';
@@ -143,12 +147,17 @@ const lengthsOf = (li, hard) => {
   return [4, 4, 5, 5, 5, 6, 6, 7];
 };
 
-export function playPetek(main, nav, li) {
+// Sonsuz Petek: nektar her saniye azalır, kelimeler doldurur; dalga ilerledikçe hızlanır
+const DRAIN = 0.9;
+const WAVE_WORDS = 8;
+
+export function playPetek(main, nav, li, { endless = false } = {}) {
   const my = new Life();
-  const goal = goalOf(li);
+  const goal = endless ? { kind: 'sonsuz', n: Infinity, hard: false, text: 'Nektar bitmeden kelime çıkar' } : goalOf(li);
   const hard = goal.hard;
   const fx = makeFx();
-  const mix = lengthsOf(li, hard);
+  let mix = endless ? lengthsOf(3, false) : lengthsOf(li, hard);
+  const best0 = save.data.sonsuz.best || 0;
   const focus = goal.kind === 'uzun' ? SOZLUK.filter((w) => w.length >= goal.len)
     : goal.kind === 'harf' ? SOZLUK.filter((w) => w.includes(goal.letter)) : null;
   const focusSet = focus ? new Set(focus) : null;
@@ -161,14 +170,18 @@ export function playPetek(main, nav, li) {
     combo: 0, comboT: 0, jarPulse: 0, flash: 0,
     aT: 1, aFrom: [], hint: null, fly: null, bee: { x: 0, y: 0, ang: 0 },
     pill: { text: '', kind: null, t: 0 },
+    nectar: 100, wave: 1, waveWords: 0, gold: -1, goldT: 0,
   };
 
-  nav.setTitle(hard ? `Zor Bölüm · ${li + 1}` : `Petek Avı · ${li + 1}`);
+  nav.setTitle(endless ? 'Sonsuz Petek' : hard ? `Zor Bölüm · ${li + 1}` : `Petek Avı · ${li + 1}`);
   main.innerHTML = toHTML(html`
-    <div class="kv ${hard ? 'kv-hard' : ''}">
+    <div class="kv ${hard ? 'kv-hard' : ''} ${endless ? 'kv-endless' : ''}">
       <div class="kv-top">
+        ${endless ? html`
+        <span class="kv-goal"><small data-wave>Nektar · 1. dalga</small><b>${best0 ? `Rekor: ${fmt(best0)} puan` : 'İlk rekorunu kır'}</b><i class="kv-pbar kv-nbar"><u data-pbar style="width:100%"></u></i></span>
+        <span class="kv-score"><b data-score>0</b><small>puan</small></span>` : html`
         <span class="kv-goal"><small>${hard ? 'Zor bölüm' : 'Hedef'}</small><b>${goal.text}</b><i class="kv-pbar"><u data-pbar></u></i></span>
-        <span class="kv-score"><b data-avail>0</b><small>kelime var</small></span>
+        <span class="kv-score"><b data-avail>0</b><small>kelime var</small></span>`}
       </div>
       <div class="pk-found" data-found><span class="pk-empty">Bulduğun kelimeler burada birikir, dokununca anlamı açılır.</span></div>
       <div class="kv-stage">
@@ -191,6 +204,8 @@ export function playPetek(main, nav, li) {
   const tapEl = wrap.querySelector('[data-tap]');
   const foundEl = wrap.querySelector('[data-found]');
   const availEl = wrap.querySelector('[data-avail]');
+  const scoreEl = wrap.querySelector('[data-score]');
+  const waveEl = wrap.querySelector('[data-wave]');
   const pbar = wrap.querySelector('[data-pbar]');
   const stage = fitCanvas(cv, my);
   let col = themeColors();
@@ -252,7 +267,7 @@ export function playPetek(main, nav, li) {
   function setBoard(e) {
     game.letters = e.letters;
     game.avail = e.m;
-    availEl.textContent = e.m.size;
+    if (availEl) availEl.textContent = e.m.size;
   }
 
   const freshBoard = () => search(() => {
@@ -406,6 +421,14 @@ export function playPetek(main, nav, li) {
     }
     refill(path);
     path.forEach((i, k) => { game.born[i] = -(0.16 + k * 0.06); });
+    // Sonsuzda ara ara altın göz çıkar: o gözden geçen kelime iki kat puan
+    if (endless) {
+      if (path.includes(game.gold)) game.gold = -1;
+      if (game.gold < 0 && Math.random() < 0.32) {
+        game.gold = pick(ALL.filter((i) => !path.includes(i)));
+        game.goldT = 0;
+      }
+    }
     if (game.avail.size === 0 && !game.done) {
       my.timeout(() => {
         if (game.done) return;
@@ -442,6 +465,7 @@ export function playPetek(main, nav, li) {
       say(trUpper(w), 'extra', 0.6);
       banner(`Ekstra: ${trUpper(w)}  +${pts}`, 'extra');
       sfx.coin();
+      if (endless) { game.nectar = Math.min(100, game.nectar + 5); scoreEl.textContent = fmt(game.honey); }
       popCells(path, 150);
       if (goal.kind === 'bal') setProg(pts);
       return;
@@ -454,14 +478,28 @@ export function playPetek(main, nav, li) {
       game.shakeCell = path[path.length - 1];
       my.timeout(() => { game.shakeCell = -1; }, 300);
       say(`${trUpper(w)} yok`, 'no', 0.8);
+      if (endless) game.nectar = Math.max(0, game.nectar - 4);
       return;
     }
     game.used.add(w);
     game.combo++;
     game.comboT = 3.2;
-    const mult = (1 + Math.min(1.5, (game.combo - 1) * 0.25)) * (hard ? 1.5 : 1);
+    const gold = endless && path.includes(game.gold);
+    const mult = (1 + Math.min(1.5, (game.combo - 1) * 0.25)) * (hard ? 1.5 : 1) * (endless ? 1 + (game.wave - 1) * 0.25 : 1) * (gold ? 2 : 1);
     const pts = Math.round(scoreOf(w) * mult);
     game.honey += pts;
+    if (endless) {
+      game.nectar = Math.min(100, game.nectar + w.length * 5 + Math.min(10, game.combo * 2) + (gold ? 12 : 0));
+      scoreEl.textContent = fmt(game.honey);
+      scoreEl.parentElement.animate([{ transform: 'scale(1.15)' }, { transform: 'none' }], { duration: 260 });
+      if (gold) {
+        const gp = lay.pos[game.gold];
+        fx.burst(gp.x, gp.y, { n: 30, colors: ['#ffd34d', '#fff', '#ffb31a'], power: 320 });
+        fx.ring(gp.x, gp.y, '#ffd34d', lay.s * 2.4);
+      }
+      game.waveWords++;
+      if (game.waveWords >= WAVE_WORDS) nextWave();
+    }
     game.jarPulse = 1;
     game.flash = 0.5;
     game.words++;
@@ -472,7 +510,7 @@ export function playPetek(main, nav, li) {
     addChip(w);
     if (w.length > game.last.length) game.last = w;
     say(trUpper(w), 'ok', 0.6);
-    banner(`${trUpper(w)}  +${pts}`, w.length >= 6 ? 'big' : '');
+    banner(gold ? `Altın göz! ${trUpper(w)}  +${pts}` : `${trUpper(w)}  +${pts}`, gold || w.length >= 6 ? 'big' : '');
     if (game.combo >= 2) {
       comboEl.textContent = `${game.combo} üst üste  x${String(Math.round(mult * 100) / 100).replace('.', ',')}`;
       comboEl.classList.add('on');
@@ -482,13 +520,56 @@ export function playPetek(main, nav, li) {
     tone({ type: 'triangle', f: 420 + w.length * 70, f2: 900, dur: 0.2, vol: 0.07 });
     buzz(16);
     popCells(path, game.combo >= 3 ? 340 : 220);
-    for (let k = 0; k < Math.min(6, Math.ceil(w.length / 1.5)); k++) {
+    for (let k = 0; k < Math.min(3, Math.ceil(w.length / 2)); k++) {
       game.bees.push({ x: rand(-40, stage.W * 0.3), y: rand(stage.H * 0.2, stage.H * 0.8), t: 0, w: rand(0, 6) });
     }
+    if (endless) return;
     if (goal.kind === 'bal') setProg(pts);
     else if (goal.kind === 'kelime') setProg(1);
     else if (goal.kind === 'uzun') setProg(w.length >= goal.len ? 1 : 0);
     else setProg(w.split('').filter((c) => c === goal.letter).length);
+  }
+
+  function nextWave() {
+    game.wave++;
+    game.waveWords = 0;
+    mix = lengthsOf(game.wave >= 4 ? 30 : game.wave === 3 ? 18 : 10, false);
+    waveEl.textContent = `Nektar · ${game.wave}. dalga`;
+    banner(`${game.wave}. Dalga  puan x${String(1 + (game.wave - 1) * 0.25).replace('.', ',')}`, 'big');
+    sfx.fanfare();
+    buzz(30);
+    for (const p of lay.pos) fx.burst(p.x, p.y, { n: 3, colors: ['#ffcd3c', '#fff'], power: 120 });
+  }
+
+  function endRun() {
+    if (game.done) return;
+    game.done = true;
+    game.sel = [];
+    syncWord();
+    const k = koloni();
+    const bon = bonus(k);
+    const honey = Math.round(game.honey * (1 + bon));
+    const S = save.data.sonsuz;
+    const record = game.honey > (S.best || 0);
+    S.runs++;
+    S.words += game.words;
+    if (record) { S.best = game.honey; S.wave = game.wave; }
+    save.data.stats.honey += honey;
+    if (game.last.length > (save.data.stats.longest || '').length) save.data.stats.longest = game.last;
+    save.touch('stats');
+    submitScore();
+    sfx.whoosh();
+    my.timeout(() => resultSheet({
+      title: record ? 'Yeni Rekor!' : 'Nektar Bitti',
+      sub: `${game.wave}. dalgaya kadar dayandın.`,
+      stars: null,
+      honey,
+      stats: [['Puan', fmt(game.honey)], ['Kelime', game.words], ['Dalga', game.wave], ['En uzun', game.last ? trUpper(game.last) : '-'], ['Rekor', fmt(S.best)], ...(bon ? [['Bahçe bereketi', `%${Math.round(bon * 100)}`]] : [])],
+      buttons: [
+        { label: 'Yeniden Dene', main: true, icon: 'replay', act: () => nav.toLevel(0) },
+        { label: 'Kovana Dön', icon: 'home', act: () => nav.toHome() },
+      ],
+    }), 500);
   }
 
   /* ---------- Dokunma: parmağını gezdir ya da tek tek dokun ---------- */
@@ -611,6 +692,21 @@ export function playPetek(main, nav, li) {
     });
   });
 
+  // Nektar çubuğu
+  const pbarEl = endless ? wrap.querySelector('[data-pbar]') : null;
+  let lastN = -1;
+  const tickNectar = (dt) => {
+    if (!endless || game.done) return;
+    game.nectar -= dt * DRAIN * 1.1 ** (game.wave - 1);
+    const n = Math.max(0, game.nectar);
+    if (Math.abs(n - lastN) > 0.3) {
+      lastN = n;
+      pbarEl.style.width = `${n}%`;
+      pbarEl.parentElement.classList.toggle('low', n < 25);
+    }
+    if (n <= 0) endRun();
+  };
+
   /* ---------- Çizim ---------- */
 
   // Göz yeri: karışırken yay çizerek yeni yerine gider
@@ -642,6 +738,7 @@ export function playPetek(main, nav, li) {
     relayout();
     link.tick();
     if (game.paused) dt = 0;
+    tickNectar(dt);
     if (game.aT < 1) game.aT = Math.min(1, game.aT + dt * 1.5);
     g.drawImage(backdrop, 0, 0, W, H);
 
@@ -696,7 +793,15 @@ export function playPetek(main, nav, li) {
       g.fillStyle = 'rgba(42,22,54,.22)';
       g.fill();
       hexPath(g, x, y, s);
-      g.fillStyle = on ? '#2ee6a0' : litNow ? '#ffffff' : col.cell;
+      const goldNow = endless && i === game.gold;
+      if (goldNow && !on) {
+        const gg = g.createLinearGradient(x - s, y - s, x + s, y + s);
+        const sh = (Math.sin(t / 260) + 1) / 2;
+        gg.addColorStop(0, '#fff3b0');
+        gg.addColorStop(Math.min(0.95, 0.2 + sh * 0.6), '#ffd34d');
+        gg.addColorStop(1, '#f0a000');
+        g.fillStyle = gg;
+      } else g.fillStyle = on ? '#2ee6a0' : litNow ? '#ffffff' : col.cell;
       g.fill();
       g.lineWidth = Math.max(2.5, lay.s * 0.09);
       g.strokeStyle = INK;

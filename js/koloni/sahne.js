@@ -1,5 +1,8 @@
-// Kovanın sahnesi ve petek çerçevesi: SVG olarak çizilir, CSS ile canlanır.
-// Mevsim, hava, gece-gündüz ve koloninin büyüklüğü her şeyi değiştirir.
+// Kovanın sahnesi ve petek çerçevesi: SVG olarak çizilir, CSS ile canlanır; arılar, kuşlar ve hava
+// canli.js içindeki tuval katmanında yaşar. Mevsim, hava, günün saati ve bahçe her şeyi değiştirir.
+
+import { save } from '../core/save.js';
+import { gardenSVG } from './bahce.js';
 
 const INK = '#2a1636';
 const rnd = (seed) => {
@@ -19,79 +22,112 @@ const SKY = {
   kis: ['#c9d8ea', '#f2f6fb'],
   gece: ['#141a42', '#3b2c5e'],
   kapali: ['#a9b7c6', '#e6ebf0'],
+  safak: ['#ffb38a', '#ffe8c4'],
+  aksam: ['#7a5aa8', '#ffad7a'],
 };
 const GROUND = { bahar: ['#8fd06a', '#6fb44e'], yaz: ['#a8cf5c', '#86b343'], guz: ['#d9ab55', '#bf8a3c'], kis: ['#f4f7fb', '#dfe7f0'] };
 const HILL = { bahar: ['#b9e59b', '#9fd47f'], yaz: ['#c5df86', '#a9c86b'], guz: ['#e8be7a', '#d39f5c'], kis: ['#e9eef5', '#d5dfea'] };
 const CANOPY = { bahar: ['#ffc6db', '#ffdbe8', '#f7a8c6'], yaz: ['#5fb35a', '#76c46a', '#4f9e4b'], guz: ['#f29a3a', '#f6b452', '#de7a2c'], kis: [] };
 const PETAL = { bahar: ['#ffffff', '#ffd1e3', '#ffe27a', '#c9b6ff'], yaz: ['#b98bff', '#9d6cf2', '#ffe27a', '#ff9ec4'], guz: ['#ffcd3c', '#f29a3a'], kis: [] };
 
-const beeGlyph = (s = 1) => `<g transform="scale(${s})"><ellipse class="sb-wing" cx="-1" cy="-5" rx="4.5" ry="2.6" fill="#fff" opacity=".85"/><ellipse class="sb-wing sb-wing2" cx="3" cy="-4.6" rx="3.6" ry="2.2" fill="#fff" opacity=".8"/><ellipse cx="0" cy="0" rx="5.4" ry="3.8" fill="#ffcd3c" stroke="${INK}" stroke-width="1.3"/><path d="M-1 -3.6v7.2M2.4 -3.2v6.4" stroke="${INK}" stroke-width="1.5"/><circle cx="-4.6" cy="-.6" r="1.6" fill="${INK}"/></g>`;
+export const beeGlyph = (s = 1) => `<g transform="scale(${s})"><ellipse class="sb-wing" cx="-1" cy="-5" rx="4.5" ry="2.6" fill="#fff" opacity=".85"/><ellipse class="sb-wing sb-wing2" cx="3" cy="-4.6" rx="3.6" ry="2.2" fill="#fff" opacity=".8"/><ellipse cx="0" cy="0" rx="5.4" ry="3.8" fill="#ffcd3c" stroke="${INK}" stroke-width="1.3"/><path d="M-1 -3.6v7.2M2.4 -3.2v6.4" stroke="${INK}" stroke-width="1.5"/><circle cx="-4.6" cy="-.6" r="1.6" fill="${INK}"/></g>`;
 
-export function sceneSVG(k) {
+// Kovan kat sayısına göre ölçeklenir ki tepesi sahneden taşmasın; giriş deliği buna göre yer değiştirir
+const HIVE_SCALE = [1.3, 1.24, 1.06, 0.92];
+const hiveScale = (boxes) => HIVE_SCALE[Math.max(0, Math.min(3, boxes - 1))];
+export const ENTRANCE = { x: 232, y: 186 };
+const WILD = [[96, 200], [118, 222], [150, 204], [186, 222], [292, 204], [312, 222], [344, 202], [368, 222], [392, 206], [40, 230]];
+
+// Sahne: SVG katmanı ve canlı katmanın kullanacağı çiçek başları
+export function sceneData(k) {
   const r = rnd(k.day + 3);
   const night = k.night;
+  const hour = k.hour ?? 12;
   const grey = ['yagmur', 'bulut', 'kar'].includes(k.weather);
-  const sky = night ? SKY.gece : grey && k.season !== 'kis' ? SKY.kapali : SKY[k.season];
+  let sky = SKY[k.season];
+  if (night) sky = SKY.gece;
+  else if (grey && k.season !== 'kis') sky = SKY.kapali;
+  else if (hour < 8) sky = SKY.safak;
+  else if (hour >= 18) sky = SKY.aksam;
   const [g1, g2] = GROUND[k.season];
   const [h1, h2] = HILL[k.season];
+  const garden = gardenSVG(k);
+  const heads = [...garden.heads];
   const out = [];
   out.push(`<defs>
     <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient>
     <linearGradient id="boxG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd65a"/><stop offset="1" stop-color="#eaa725"/></linearGradient>
     <linearGradient id="boxG2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2c9"/><stop offset="1" stop-color="#f1d58e"/></linearGradient>
     <radialGradient id="sunG"><stop offset="0" stop-color="#fff7c2"/><stop offset=".6" stop-color="#ffd84a"/><stop offset="1" stop-color="#ffd84a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="glowG"><stop offset="0" stop-color="#ffe27a" stop-opacity=".7"/><stop offset="1" stop-color="#ffe27a" stop-opacity="0"/></radialGradient>
+    <linearGradient id="hazeG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".35"/></linearGradient>
   </defs>`);
   out.push('<rect width="400" height="240" fill="url(#skyG)"/>');
-  // Gökyüzü: güneş, ay, yıldızlar
+  // Gökyüzü: güneş ışınlarıyla döner, gece ay ve yıldızlar
   if (night) {
-    for (let i = 0; i < 26; i++) out.push(`<circle class="sb-star" style="animation-delay:${(-r() * 3).toFixed(2)}s" cx="${(r() * 400).toFixed(1)}" cy="${(r() * 110).toFixed(1)}" r="${(0.6 + r() * 1.2).toFixed(1)}" fill="#fff"/>`);
-    out.push(`<circle cx="330" cy="46" r="18" fill="#fff6d6"/><circle cx="338" cy="40" r="16" fill="${sky[0]}"/>`);
+    for (let i = 0; i < 34; i++) out.push(`<circle class="sb-star" style="animation-delay:${(-r() * 3).toFixed(2)}s;animation-duration:${(1.8 + r() * 2.4).toFixed(1)}s" cx="${(r() * 400).toFixed(1)}" cy="${(r() * 120).toFixed(1)}" r="${(0.5 + r() * 1.3).toFixed(1)}" fill="#fff"/>`);
+    out.push(`<g class="sb-moon"><circle cx="330" cy="46" r="26" fill="#fff6d6" opacity=".12"/><circle cx="330" cy="46" r="18" fill="#fff6d6"/><circle cx="338" cy="40" r="16" fill="${sky[0]}"/></g>`);
   } else if (!grey || k.weather === 'gunes') {
-    out.push(`<circle class="sb-sun" cx="335" cy="48" r="${k.weather === 'sicak' ? 44 : 34}" fill="url(#sunG)"/><circle cx="335" cy="48" r="${k.weather === 'sicak' ? 22 : 17}" fill="#ffe066" stroke="${INK}" stroke-width="2"/>`);
+    const sy = hour < 8 ? 92 : hour >= 18 ? 96 : 48;
+    const sr = k.weather === 'sicak' ? 22 : 17;
+    out.push(`<g class="sb-rays" style="transform-origin:335px ${sy}px">${Array.from({ length: 12 }, (_, i) => `<path d="M335 ${sy - sr - 6} l3 -12 l3 12z" fill="#ffe066" opacity=".55" transform="rotate(${i * 30} 335 ${sy})"/>`).join('')}</g>`);
+    out.push(`<circle class="sb-sun" cx="335" cy="${sy}" r="${sr * 2}" fill="url(#sunG)"/><circle cx="335" cy="${sy}" r="${sr}" fill="${hour >= 18 || hour < 8 ? '#ffb347' : '#ffe066'}" stroke="${INK}" stroke-width="2"/>`);
   }
-  // Bulutlar
-  const clouds = grey ? 5 : k.weather === 'ruzgar' ? 3 : night ? 1 : 2;
+  // Bulutlar sahnenin bir ucundan öbürüne geçer
+  const clouds = grey ? 6 : k.weather === 'ruzgar' ? 4 : night ? 2 : 3;
   for (let i = 0; i < clouds; i++) {
-    const y = 18 + r() * 60;
-    const s = 0.7 + r() * 0.7;
+    const y = 14 + r() * 64;
+    const sc = 0.6 + r() * 0.8;
     const c = grey && !night ? '#eef1f5' : '#ffffff';
-    out.push(`<g class="sb-cloud" style="animation-duration:${(40 + r() * 40).toFixed(0)}s;animation-delay:${(-r() * 60).toFixed(1)}s"><g transform="translate(${(r() * 380).toFixed(0)} ${y.toFixed(0)}) scale(${s.toFixed(2)})" opacity="${night ? 0.25 : 0.95}"><ellipse cx="0" cy="0" rx="26" ry="11" fill="${c}"/><ellipse cx="-14" cy="3" rx="16" ry="9" fill="${c}"/><ellipse cx="15" cy="2" rx="18" ry="9.5" fill="${c}"/><ellipse cx="2" cy="-7" rx="15" ry="10" fill="${c}"/></g></g>`);
+    const dur = (k.weather === 'ruzgar' ? 30 : 70) + r() * 50;
+    out.push(`<g class="sb-cloud" style="animation-duration:${dur.toFixed(0)}s;animation-delay:${(-r() * dur).toFixed(1)}s"><g transform="translate(-70 ${y.toFixed(0)}) scale(${sc.toFixed(2)})" opacity="${night ? 0.22 : 0.95}"><ellipse cx="0" cy="0" rx="26" ry="11" fill="${c}"/><ellipse cx="-14" cy="3" rx="16" ry="9" fill="${c}"/><ellipse cx="15" cy="2" rx="18" ry="9.5" fill="${c}"/><ellipse cx="2" cy="-7" rx="15" ry="10" fill="${c}"/></g></g>`);
   }
   // Tepeler ve çayır
   out.push(`<path d="M0 150 Q70 110 150 140 T300 128 T400 140 V240 H0z" fill="${night ? '#2c3a55' : h1}"/>`);
   out.push(`<path d="M0 165 Q90 140 190 158 T400 150 V240 H0z" fill="${night ? '#24314a' : h2}"/>`);
+  if (!night) out.push('<rect y="120" width="400" height="60" fill="url(#hazeG)"/>');
   out.push(`<path d="M0 182 Q120 168 240 178 T400 176 V240 H0z" fill="${night ? '#1d2a40' : g1}"/>`);
   out.push(`<rect y="205" width="400" height="35" fill="${night ? '#18233a' : g2}"/>`);
-  // Ağaç
+  // Yaşlı ağaç
   out.push('<g transform="translate(66 186)">');
   out.push(`<path d="M-5 0 L-3 -46 Q-2 -52 0 -56 Q2 -52 3 -46 L5 0z" fill="#8a5a33" stroke="${INK}" stroke-width="2"/>`);
   out.push(`<path d="M0 -40 L-16 -58 M1 -46 L14 -64 M0 -52 L-6 -70" stroke="#8a5a33" stroke-width="4" stroke-linecap="round"/>`);
   const can = CANOPY[k.season];
   if (can.length) {
+    out.push('<g class="sb-crown">');
     [[-18, -64, 20], [14, -70, 22], [-4, -84, 22], [-26, -78, 15], [26, -86, 15]].forEach(([x, y, rr], i) => {
       out.push(`<circle class="sb-leafy" style="animation-delay:${-i * 0.6}s" cx="${x}" cy="${y}" r="${rr}" fill="${night ? '#2f4a3c' : can[i % can.length]}" stroke="${INK}" stroke-width="1.6"/>`);
     });
-    if (k.season === 'bahar' && !night) for (let i = 0; i < 9; i++) out.push(`<circle cx="${(-30 + r() * 60).toFixed(0)}" cy="${(-96 + r() * 44).toFixed(0)}" r="2.6" fill="#fff"/>`);
+    if (k.season === 'bahar' && !night) for (let i = 0; i < 12; i++) out.push(`<circle cx="${(-30 + r() * 60).toFixed(0)}" cy="${(-96 + r() * 44).toFixed(0)}" r="2.6" fill="#fff"/>`);
+    out.push('</g>');
+    if (k.season === 'bahar' && !night) heads.push({ x: 60, y: 110, tree: true });
   } else {
     out.push(`<path d="M-16 -58 l-8 -10 M14 -64 l8 -12 M-6 -70 l-4 -12" stroke="#8a5a33" stroke-width="3" stroke-linecap="round"/>`);
     out.push('<path d="M-22 -60 h14 M8 -66 h14 M-10 -74 h10" stroke="#fff" stroke-width="3" stroke-linecap="round"/>');
   }
   out.push('</g>');
-  // Çiçekler
+  // Kır çiçekleri: bahçe doldukça azalır
   const petals = PETAL[k.season];
-  const spots = [[112, 198], [130, 214], [150, 196], [172, 216], [296, 200], [318, 214], [340, 198], [360, 216], [380, 202], [96, 218], [196, 222], [276, 222], [24, 214], [46, 226], [386, 228]];
-  spots.forEach(([x, y], i) => {
-    if (!petals.length || i / spots.length >= k.bloom) return;
+  const gardenFlowers = save.data.garden.filter((x) => x.id && !['erik', 'ihlamur', 'kestane', 'cam', 'yalak', 'otel', 'kusevi', 'fener', 'bank'].includes(x.id)).length;
+  const wildN = Math.max(3, WILD.length - gardenFlowers);
+  WILD.slice(0, wildN).forEach(([x, y], i) => {
+    if (!petals.length || i / wildN >= k.bloom) return;
     const col = night ? '#5b5f86' : petals[i % petals.length];
     out.push(`<g class="sb-flower" style="animation-delay:${(-r() * 3).toFixed(2)}s" transform="translate(${x} ${y})"><path d="M0 0 q1 -8 0 -14" stroke="${night ? '#2f4a3c' : '#3f9b55'}" stroke-width="2" fill="none"/>${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="0" cy="-19" rx="2.6" ry="4.6" fill="${col}" transform="rotate(${a} 0 -14)"/>`).join('')}<circle cx="0" cy="-14" r="2.4" fill="#ffcd3c"/></g>`);
+    if (!night) heads.push({ x, y: y - 14 });
   });
+  // Bahçe: kovanın arkasındakiler önce, öndekiler sonra çizilir
+  const back = garden.items.filter((x) => x.y < 200).map((x) => x.svg);
+  const front = garden.items.filter((x) => x.y >= 200).map((x) => x.svg);
+  out.push(back.join(''));
   // Kovan: kat sayısı koloniyle büyür
   const bx = 232;
   const base = 196;
-  out.push(`<g transform="translate(${bx} ${base + 8}) scale(1.3) translate(${-bx} ${-base - 8})"><g class="sb-hive"><rect x="${bx - 52}" y="${base}" width="104" height="8" rx="2" fill="#8a5a33" stroke="${INK}" stroke-width="2"/><path d="M${bx - 44} ${base + 8} v14 M${bx + 44} ${base + 8} v14" stroke="#8a5a33" stroke-width="5"/>`);
+  const hs = hiveScale(k.boxes);
+  out.push(`<g transform="translate(${bx} ${base + 8}) scale(${hs}) translate(${-bx} ${-base - 8})"><g class="sb-hive"><ellipse cx="${bx}" cy="${base + 22}" rx="58" ry="5" fill="#2a163625"/><rect x="${bx - 52}" y="${base}" width="104" height="8" rx="2" fill="#8a5a33" stroke="${INK}" stroke-width="2"/><path d="M${bx - 44} ${base + 8} v14 M${bx + 44} ${base + 8} v14" stroke="#8a5a33" stroke-width="5"/>`);
   for (let i = 0; i < k.boxes; i++) {
     const y = base - (i + 1) * 28;
-    out.push(`<rect x="${bx - 46}" y="${y}" width="92" height="28" rx="3" fill="url(#${i % 2 ? 'boxG2' : 'boxG'})" stroke="${INK}" stroke-width="2.4"/><path d="M${bx - 40} ${y + 14} h80" stroke="${INK}" stroke-width="1.2" opacity=".25"/>`);
+    out.push(`<rect x="${bx - 46}" y="${y}" width="92" height="28" rx="3" fill="url(#${i % 2 ? 'boxG2' : 'boxG'})" stroke="${INK}" stroke-width="2.4"/><path d="M${bx - 40} ${y + 14} h80" stroke="${INK}" stroke-width="1.2" opacity=".25"/><circle cx="${bx + 34}" cy="${y + 8}" r="2" fill="${INK}" opacity=".35"/>`);
   }
   const top = base - k.boxes * 28;
   out.push(`<path d="M${bx - 54} ${top} h108 l-10 -14 h-88z" fill="#c98b52" stroke="${INK}" stroke-width="2.4"/>`);
@@ -99,20 +135,18 @@ export function sceneSVG(k) {
   out.push(`<rect x="${bx - 14}" y="${base - 9}" width="28" height="6" rx="3" fill="${INK}"/><path d="M${bx - 20} ${base - 3} h40 l6 6 h-52z" fill="#a8743f" stroke="${INK}" stroke-width="1.6"/></g></g>`);
   // Arıcı: sonbahar hasadında kovanın yanında
   if (k.season === 'guz' && !night && k.weather !== 'yagmur') {
-    out.push(`<g class="sb-keeper" transform="translate(316 186)"><path d="M-12 18 l-3 -34 h30 l-3 34z" fill="#f1f5fb" stroke="${INK}" stroke-width="2"/><circle cx="0" cy="-26" r="12" fill="#fff" stroke="${INK}" stroke-width="2"/><path d="M-12 -26 h24" stroke="${INK}" stroke-width="1.5"/><path d="M-17 -36 q17 -12 34 0 l2 6 h-38z" fill="#c98b52" stroke="${INK}" stroke-width="2"/><path d="M-16 -6 q-14 4 -22 -4" stroke="${INK}" stroke-width="3" fill="none"/><rect x="-46" y="-16" width="10" height="16" rx="2" fill="#8c97a8" stroke="${INK}" stroke-width="1.6"/><g class="sb-smoke"><circle cx="-41" cy="-24" r="4" fill="#e5ebf2"/><circle cx="-38" cy="-33" r="5" fill="#e5ebf2" opacity=".7"/></g></g>`);
+    out.push(`<g class="sb-keeper" transform="translate(316 186)"><path d="M-12 18 l-3 -34 h30 l-3 34z" fill="#f1f5fb" stroke="${INK}" stroke-width="2"/><circle cx="0" cy="-26" r="12" fill="#fff" stroke="${INK}" stroke-width="2"/><path d="M-12 -26 h24" stroke="${INK}" stroke-width="1.5"/><path d="M-17 -36 q17 -12 34 0 l2 6 h-38z" fill="#c98b52" stroke="${INK}" stroke-width="2"/><g class="sb-arm"><path d="M-16 -6 q-14 4 -22 -4" stroke="${INK}" stroke-width="3" fill="none"/><rect x="-46" y="-16" width="10" height="16" rx="2" fill="#8c97a8" stroke="${INK}" stroke-width="1.6"/></g><g class="sb-smoke"><circle cx="-41" cy="-24" r="4" fill="#e5ebf2"/><circle cx="-38" cy="-33" r="5" fill="#e5ebf2" opacity=".7"/><circle cx="-35" cy="-43" r="6" fill="#e5ebf2" opacity=".45"/></g></g>`);
   }
-  // Arılar: koloni büyüdükçe çoğalır, gece ve kışın kovanda kalır
-  const n = night ? 1 : k.season === 'kis' ? (k.weather === 'gunes' ? 2 : 0) : Math.max(2, Math.min(14, Math.round(k.bees / 2600)));
-  for (let i = 0; i < n; i++) {
-    out.push(`<g transform="translate(${bx} ${base - 6})"><g class="sb-fly sb-f${i % 5}" style="animation-delay:${(-i * 1.37).toFixed(2)}s;animation-duration:${(5 + (i % 4) * 1.3).toFixed(1)}s">${beeGlyph(0.9)}</g></g>`);
-  }
-  // Hava
-  if (k.weather === 'yagmur') for (let i = 0; i < 46; i++) out.push(`<path class="sb-rain" style="animation-delay:${(-r()).toFixed(2)}s;animation-duration:${(0.6 + r() * 0.4).toFixed(2)}s" d="M${(r() * 420).toFixed(0)} ${(-20 - r() * 60).toFixed(0)} l-5 14" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>`);
-  if (k.weather === 'kar') for (let i = 0; i < 40; i++) out.push(`<circle class="sb-snow" style="animation-delay:${(-r() * 6).toFixed(2)}s;animation-duration:${(4 + r() * 4).toFixed(1)}s" cx="${(r() * 400).toFixed(0)}" cy="-10" r="${(1.2 + r() * 1.8).toFixed(1)}" fill="#fff"/>`);
-  if (k.weather === 'ruzgar' && k.season !== 'kis') for (let i = 0; i < 7; i++) out.push(`<ellipse class="sb-leaf" style="animation-delay:${(-r() * 5).toFixed(2)}s;animation-duration:${(3.5 + r() * 2.5).toFixed(1)}s" cx="-20" cy="${(60 + r() * 120).toFixed(0)}" rx="4" ry="2" fill="${k.season === 'guz' ? '#e08a2c' : '#7cc265'}"/>`);
-  if (k.weather === 'sicak' && !night) out.push('<rect class="sb-heat" y="150" width="400" height="60" fill="#fff" opacity=".08"/>');
-  return `<svg class="scene" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${out.join('')}</svg>`;
+  out.push(front.join(''));
+  if (night) out.push('<rect width="400" height="240" fill="#0b0f2e" opacity=".18"/>');
+  return {
+    svg: `<svg class="scene" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${out.join('')}</svg>`,
+    heads,
+    entrance: { x: bx, y: base + 8 - 14 * hs },
+    hive: { x0: bx - 54 * hs, x1: bx + 54 * hs, y0: base + 8 - (k.boxes * 28 + 26) * hs, y1: base + 22 },
+  };
 }
+export const sceneSVG = (k) => sceneData(k).svg;
 
 /* ---------- Petek çerçevesi: koloniyle büyüyen 3B petek ---------- */
 

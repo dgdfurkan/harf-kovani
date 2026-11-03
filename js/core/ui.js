@@ -131,7 +131,7 @@ export function howSheet(lines, title = 'Nasıl Oynanır?') {
 // Yıldızlar birer birer çakar, bal sayılır. extra: kovan haberi gibi ek blok
 export function resultSheet({ title, sub = '', stars = 0, honey = 0, stats = [], extra = '', buttons = [] }) {
   const { el: sheet, close } = openSheet(html`
-    <div class="res-stars">${[0, 1, 2].map((i) => html`<i data-s="${i}">${icon('star')}</i>`)}</div>
+    ${stars === null ? '' : html`<div class="res-stars">${[0, 1, 2].map((i) => html`<i data-s="${i}">${icon('star')}</i>`)}</div>`}
     <h2 class="sh-title res-title">${title}</h2>
     ${sub ? html`<p class="sh-text">${sub}</p>` : ''}
     ${stats.length ? html`<div class="res-stats">${stats.map(([k, v]) => html`<div class="res-stat"><span>${k}</span><b>${v}</b></div>`)}</div>` : ''}
@@ -147,7 +147,7 @@ export function resultSheet({ title, sub = '', stars = 0, honey = 0, stats = [],
   buzz(30);
   for (let i = 0; i < 3; i++) {
     const n = sheet.querySelector(`[data-s="${i}"]`);
-    if (i < stars) {
+    if (stars !== null && i < stars) {
       setTimeout(() => {
         n.classList.add('on');
         n.animate([{ transform: 'scale(2.4) rotate(-30deg)', opacity: 0 }, { transform: 'scale(1) rotate(0)', opacity: 1 }], { duration: 380, easing: 'cubic-bezier(.34,1.56,.64,1)' });
