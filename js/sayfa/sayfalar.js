@@ -1,6 +1,6 @@
 // Ana ekran dışındaki sayfalar: bölüm listesi, kelime defteri, sıralama, ayarlar
 
-import { html, toHTML, trUpper, trLower } from '../core/dom.js';
+import { html, toHTML, raw, trUpper, trLower } from '../core/dom.js';
 import { save } from '../core/save.js';
 import { sfx, buzz, syncVolumes } from '../core/audio.js';
 import { icon, starsHTML, toast, askSheet, openSheet } from '../core/ui.js';
@@ -8,6 +8,8 @@ import { lbReady, fetchBoard, submitScore } from '../core/dreamlo.js';
 import { PUZZLES } from '../data/kovan-levels.js';
 import { CICEK_LEVELS } from '../oyun/cicek.js';
 import { PETEK_LEVELS } from '../oyun/petek.js';
+import { CENGEL_LEVELS } from '../oyun/cengel.js';
+import { DIYAR } from '../oyun/diyar.js';
 import { wordCard, meaningOf } from '../oyun/kart.js';
 import { koloni, fmt, chapterFor } from '../koloni/koloni.js';
 import { introStory, chapterSheet } from '../koloni/hikaye.js';
@@ -30,7 +32,43 @@ const bindGo = (root, go) => root.addEventListener('click', (e) => {
 
 /* ---------- Bölümler ---------- */
 
+// Çengel Bulmaca: bölümler durak durak, her durağın kendi manzarası
+function mountRoute(root, go) {
+  const stars = save.data.cengel.stars;
+  const open = Math.min(CENGEL_LEVELS - 1, stars.filter((s) => s > 0).length);
+  const stops = Math.ceil(CENGEL_LEVELS / 10);
+  root.innerHTML = toHTML(page('Çengel Bulmaca', html`
+    <p class="pg-sub">Harf çarkından kelime çıkar, bulmacayı doldur. Arılar çiçek peşinde Türkiye'yi dolaşıyor; her on bölüm yeni bir durak.</p>
+    ${Array.from({ length: stops }, (_, s) => {
+      const d = DIYAR[s % DIYAR.length];
+      const first = s * 10;
+      const locked = first > open;
+      const done = Array.from({ length: 10 }, (_, i) => stars[first + i] || 0).filter(Boolean).length;
+      return html`<section class="stop ${locked ? 'locked' : ''}" style="--ac:${d.accent}">
+        <div class="stop-art">${raw(`<svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice"><g transform="translate(0 -170)">${d.svg()}</g></svg>`)}<span><b>${d.name}</b><small>${s + 1}. durak · ${d.place} · ${done}/10</small></span></div>
+        <div class="stop-lv">${Array.from({ length: Math.min(10, CENGEL_LEVELS - first) }, (_, i) => {
+          const li = first + i;
+          const lk = li > open;
+          return html`<button class="slv ${lk ? 'lk' : ''} ${li === open ? 'cur' : ''} ${stars[li] ? 'ok' : ''}" data-level="${li}">${lk ? icon('lock') : html`<b>${i + 1}</b>${starsHTML(stars[li] || 0)}`}</button>`;
+        })}</div>
+      </section>`;
+    })}`));
+  const pg = root.firstElementChild;
+  bindGo(pg, go);
+  pg.addEventListener('click', (e) => {
+    const lv = e.target.closest('[data-level]');
+    if (!lv) return;
+    if (lv.classList.contains('lk')) { sfx.bad(); buzz(20); toast('Önce önceki bölümleri geç.'); return; }
+    sfx.tap();
+    go(`oyna/cengel/${lv.dataset.level}`);
+  });
+  const cur = pg.querySelector('.slv.cur');
+  if (cur) requestAnimationFrame(() => cur.scrollIntoView({ block: 'center' }));
+  return { dispose() {} };
+}
+
 export function mountLevels(root, go, mode) {
+  if (mode === 'cengel') return mountRoute(root, go);
   const total = mode === 'cicek' ? CICEK_LEVELS : PETEK_LEVELS;
   const stars = save.data[mode].stars;
   const open = Math.min(total - 1, stars.filter((s) => s > 0).length);

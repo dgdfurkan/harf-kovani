@@ -10,6 +10,8 @@ import { liveScene } from '../koloni/canli.js';
 import { balance, bonus, bloomingCount } from '../koloni/bahce.js';
 import { CICEK_LEVELS } from '../oyun/cicek.js';
 import { PETEK_LEVELS } from '../oyun/petek.js';
+import { CENGEL_LEVELS } from '../oyun/cengel.js';
+import { diyarOf } from '../oyun/diyar.js';
 
 const INK = '#2a1636';
 export const nextLevel = (mode, total) => Math.min(total - 1, save.data[mode].stars.filter((s) => s > 0).length);
@@ -35,6 +37,8 @@ export function mountHome(root, go) {
   const np = nextLevel('petek', PETEK_LEVELS);
   const doneC = s.cicek.stars.filter((x) => x > 0).length;
   const doneP = s.petek.stars.filter((x) => x > 0).length;
+  const ng = nextLevel('cengel', CENGEL_LEVELS);
+  const dg = diyarOf(ng);
   const away = s.colony.lastVisit ? Date.now() - s.colony.lastVisit : 0;
   const greet = away > 20 * 60 * 1000 ? `Hoş geldin! ${k.name} kovanı seni bekliyordu. ` : '';
   const bloom = bloomingCount(k);
@@ -89,6 +93,13 @@ export function mountHome(root, go) {
               <em>Bölüm ${nc + 1} / ${CICEK_LEVELS}</em></span>
             <span class="mc-play">${icon('play')}</span>
           </button>
+          <button class="mode-card mode-cengel" data-go="oyna/cengel/${ng}" style="--ac:${dg.accent}">
+            <span class="mc-art mc-scene">${raw(`<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><g transform="translate(0 -120)">${dg.svg()}</g></svg>`)}<i class="mc-grid">${raw('<svg viewBox="0 0 60 50"><g fill="#fff" stroke="none">' + [[0, 18], [12, 18], [24, 18], [36, 18], [24, 6], [24, 30], [24, 42], [48, 18]].map(([x, y]) => `<rect x="${x + 2}" y="${y - 4}" width="10" height="10" rx="2.6"/>`).join('') + '</g></svg>')}</i></span>
+            <span class="mc-body"><b>Çengel Bulmaca</b><small>${dg.name} · ${dg.place}</small>
+              <span class="mc-bar"><u style="width:${(s.cengel.stars.filter((x) => x > 0).length / CENGEL_LEVELS) * 100}%"></u></span>
+              <em>Bölüm ${ng + 1} / ${CENGEL_LEVELS}</em></span>
+            <span class="mc-play">${icon('play')}</span>
+          </button>
           <div class="mode-pair">
             <button class="mode-card mode-petek" data-go="oyna/petek/${np}">
               <span class="mc-art">${raw(combArt())}</span>
@@ -107,6 +118,7 @@ export function mountHome(root, go) {
           <div class="h-menu">
             <button class="h-mi" data-go="bolumler/cicek">${icon('list')}<span>Çiçek Bölümleri</span></button>
             <button class="h-mi" data-go="bolumler/petek">${icon('list')}<span>Petek Bölümleri</span></button>
+            <button class="h-mi" data-go="bolumler/cengel">${icon('list')}<span>Çengel Durakları</span></button>
             <button class="h-mi" data-go="defter">${icon('book')}<span>Kelime Defteri</span></button>
             <button class="h-mi" data-go="hikaye">${icon('hex')}<span>Kovanın Hikayesi</span></button>
           </div>

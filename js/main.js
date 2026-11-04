@@ -14,6 +14,7 @@ import { mountLevels, mountBook, mountBoard, mountSettings, mountStory, applyThe
 import { mountGarden } from './sayfa/bahce.js';
 import { playCicek, CICEK_LEVELS } from './oyun/cicek.js';
 import { playPetek, PETEK_LEVELS } from './oyun/petek.js';
+import { playCengel, CENGEL_LEVELS } from './oyun/cengel.js';
 import { PUZZLES } from './data/kovan-levels.js';
 
 const app = document.getElementById('app');
@@ -108,7 +109,21 @@ async function route() {
     teardown();
     perf.reset();
     document.body.dataset.page = a || 'ana';
-    if (a === 'oyna' && b === 'sonsuz') {
+    if (a === 'oyna' && b === 'cengel') {
+      // Çengel Bulmaca kendi ferah çerçevesini kurar
+      const li = Math.max(0, Math.min(CENGEL_LEVELS - 1, Number(c) || 0));
+      const nav = {
+        setBack: () => {},
+        toList: () => go('bolumler/cengel'),
+        toLevel: (i) => {
+          if (location.hash === `#/oyna/cengel/${i}`) route();
+          else go(`oyna/cengel/${i}`);
+        },
+        toHome: () => go(''),
+      };
+      setMusic(seasonSong(li));
+      current = playCengel(app, nav, li);
+    } else if (a === 'oyna' && b === 'sonsuz') {
       const f = gameFrame('Sonsuz Petek');
       const nav = {
         setTitle: f.setTitle,
@@ -138,7 +153,7 @@ async function route() {
       setMusic(hard ? 'zor' : seasonSong(li));
       current = b === 'cicek' ? playCicek(f.main, nav, li) : playPetek(f.main, nav, li);
     } else if (a === 'bolumler') {
-      current = mountLevels(app, go, b === 'petek' ? 'petek' : 'cicek');
+      current = mountLevels(app, go, b === 'petek' ? 'petek' : b === 'cengel' ? 'cengel' : 'cicek');
       setMusic('ev');
     } else if (a === 'defter') {
       current = mountBook(app, go);

@@ -16,6 +16,7 @@ const blank = () => ({
   colony: { name: '', born: Date.now(), lastVisit: 0, chapter: 0 },
   cicek: { stars: [] },
   petek: { stars: [] },
+  cengel: { stars: [], seen: -1, extras: 0 },
   stats: { words: 0, honey: 0, hints: 0, clues: 0, longest: '', extras: 0 },
   found: [],
   garden: [],
@@ -35,6 +36,7 @@ function merge(s) {
     colony: { ...b.colony, ...(s.colony || {}) },
     cicek: { ...b.cicek, ...(s.cicek || {}) },
     petek: { ...b.petek, ...(s.petek || {}) },
+    cengel: { ...b.cengel, ...(s.cengel || {}) },
     stats: { ...b.stats, ...(s.stats || {}) },
     lb: { ...b.lb, ...(s.lb || {}) },
     sonsuz: { ...b.sonsuz, ...(s.sonsuz || {}) },
@@ -93,7 +95,8 @@ export const save = {
   levelsDone() {
     const c = state.cicek.stars.filter((x) => x > 0).length;
     const p = state.petek.stars.filter((x) => x > 0).length;
-    return c + p;
+    const g = state.cengel.stars.filter((x) => x > 0).length;
+    return c + p + g;
   },
   addFound(w) {
     if (state.found.includes(w)) return false;

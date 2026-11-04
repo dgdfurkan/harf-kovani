@@ -1,7 +1,7 @@
 // Çevrimdışı kalkan: ilk açılışta bütün oyun dosyaları cihaza iner, sonra internet gerekmez.
 // Bu dosya tools/build.py ile üretilir, elle değiştirme.
 
-const VERSION = 'bbb0984dff58';
+const VERSION = 'c1be7f599daa';
 const CACHE = `harf-kovani-${VERSION}`;
 const ASSETS = [
   "./",
@@ -36,6 +36,7 @@ const ASSETS = [
   "js/core/save.js",
   "js/core/ui.js",
   "js/data/anlam.js",
+  "js/data/cengel-levels.js",
   "js/data/kovan-levels.js",
   "js/data/kovan-sozluk.js",
   "js/koloni/bahce.js",
@@ -46,7 +47,9 @@ const ASSETS = [
   "js/main.js",
   "js/oyun/bag.js",
   "js/oyun/bitir.js",
+  "js/oyun/cengel.js",
   "js/oyun/cicek.js",
+  "js/oyun/diyar.js",
   "js/oyun/kart.js",
   "js/oyun/notlar.js",
   "js/oyun/petek.js",
