@@ -514,7 +514,7 @@ export function playCengel(root, nav, li) {
     g.fill();
     g.beginPath();
     g.arc(lay.cx, lay.cy, R, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(255,255,255,.96)';
+    g.fillStyle = '#fdfcff';
     g.fill();
     const sel = game.sel;
     const w = curWord();
