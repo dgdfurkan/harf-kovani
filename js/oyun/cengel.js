@@ -8,7 +8,7 @@ import { sfx, buzz, tone, syncVolumes } from '../core/audio.js';
 import { makeFx, rrect, label } from '../core/fx.js';
 import { pauseSheet, openSheet, icon } from '../core/ui.js';
 import { CENGEL } from '../data/cengel-levels.js';
-import { loadLists, letterLink, drawBee, hexPath } from './bag.js';
+import { loadLists, letterLink, drawBee, beeSVG } from './bag.js';
 import { helpBar, jarGain, COST } from './yardim.js';
 import { wordCard, meaningOf } from './kart.js';
 import { levelDone } from './bitir.js';
@@ -26,7 +26,7 @@ const NONE = 'rgba(0,0,0,0)';
 export function postcard(d, li, after) {
   openSheet(html`
     <div class="pc">
-      <div class="pc-art">${raw(`<svg viewBox="0 0 400 420" preserveAspectRatio="xMidYMid slice">${d.svg()}</svg>`)}</div>
+      <div class="pc-art">${raw(`<svg viewBox="0 120 600 400" preserveAspectRatio="xMidYMid slice">${d.svg()}</svg>`)}</div>
       <small>${Math.floor(li / 10) + 1}. durak · ${d.place}</small>
       <h2>${d.name}</h2>
       <p>${d.text}</p>
@@ -72,7 +72,7 @@ export function playCengel(root, nav, li) {
 
   root.innerHTML = toHTML(html`
     <div class="cg" style="--ac:${d.accent};--ac2:${d.accent2};--cg-ink:${d.ink}">
-      <div class="cg-bg">${raw(`<svg viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">${d.svg()}</svg>`)}</div>
+      <div class="cg-bg">${raw(`<svg viewBox="0 0 600 600" preserveAspectRatio="xMidYMid slice">${d.svg()}</svg>`)}</div>
       <div class="cg-veil"></div>
       <header class="cg-top">
         <button class="cg-glass" data-act="back" aria-label="Geri">${icon('back')}</button>
@@ -81,14 +81,10 @@ export function playCengel(root, nav, li) {
       </header>
       <div class="cg-stage">
         <canvas class="cg-cv"></canvas>
-        <div class="cg-side cg-left">
-          <button class="cg-round hk-jar" data-act="jar" aria-label="Kavanoz"><span data-jar-ic></span><b data-jar>%0</b></button>
-          <button class="cg-round" data-act="extras" aria-label="Ekstra kelimeler">${icon('star')}<b data-extra>0</b></button>
-        </div>
-        <div class="cg-side cg-right">
-          <button class="cg-round" data-act="clue" aria-label="İpucu">${icon('quote')}<small>%${COST.clue}</small><i class="hk-cd" data-cd="clue"></i></button>
-          <button class="cg-round cg-main" data-act="hint" aria-label="Arı Yardımı">${icon('bee')}<small>%${COST.hint}</small><i class="hk-cd" data-cd="hint"></i></button>
-        </div>
+        <button class="cg-round cg-at hk-jar" data-at="0" data-act="jar" aria-label="Kavanoz"><span data-jar-ic></span><b data-jar>%0</b></button>
+        <button class="cg-round cg-at" data-at="1" data-act="extras" aria-label="Ekstra kelimeler">${icon('star')}<b data-extra>0</b></button>
+        <button class="cg-round cg-at" data-at="2" data-act="clue" aria-label="İpucu">${icon('quote')}<small>%${COST.clue}</small><i class="hk-cd" data-cd="clue"></i></button>
+        <button class="cg-round cg-at cg-main" data-at="3" data-act="hint" aria-label="Arı Yardımı"><i class="cg-bee">${raw(beeSVG())}</i><small>%${COST.hint}</small><i class="hk-cd" data-cd="hint"></i></button>
         <button class="cg-shuffle" data-act="shuffle" aria-label="Karıştır">${icon('shuffle')}</button>
         <div class="cg-clue" data-clue></div>
         <div class="cg-banner" data-banner></div>
@@ -103,7 +99,8 @@ export function playCengel(root, nav, li) {
   const stage = fitCanvas(cv, my);
 
   /* ---------- Yerleşim ---------- */
-  const lay = { cs: 30, gx: 0, gy: 0, cx: 0, cy: 0, R: 120, lr: 26, ring: [], pillY: 0, side: false };
+  const lay = { cs: 30, gx: 0, gy: 0, cx: 0, cy: 0, R: 120, lr: 26, ring: [], pillY: 0, ph: 30, wide: false };
+  const atEls = [...wrap.querySelectorAll('[data-at]')];
   let lastW = 0;
   let lastH = 0;
   function relayout() {
@@ -111,37 +108,45 @@ export function playCengel(root, nav, li) {
     if (W === lastW && H === lastH) return;
     lastW = W;
     lastH = H;
-    // Yan ekranda bulmaca solda, çark sağda; diğer her durumda alt alta
-    const side = W / H > 1.35 && H < 620;
-    lay.side = side;
-    const colW = side ? W : Math.min(W, 620);
-    const x0 = (W - colW) / 2;
+    // Geniş ekranda bulmaca solda, harf çarkı sağda; dik ekranda bulmaca üstte, çark altta.
+    // Dört düğme çarkın çapraz köşelerine oturur, böylece çark ekranın tamamına yayılabilir.
+    const wide = W >= 600 && W / H >= 0.95;
+    lay.wide = wide;
+    const SQ = Math.SQRT2;
+    let bs;
     let gx0;
     let gy0;
     let gw;
     let gh;
-    if (side) {
-      // Çarkın iki yanındaki düğmelere yer kalsın
-      lay.R = clamp(Math.min(H * 0.34, (W * 0.5 - 160) / 2), 78, 150);
-      lay.cx = W * 0.73;
-      lay.cy = H * 0.57;
-      lay.pillY = lay.cy - lay.R - 24;
-      gx0 = 14;
-      gy0 = 12;
-      gw = W * 0.47 - 24;
-      gh = H - 24;
+    if (wide) {
+      const cw = Math.min(W, 1360);
+      const x0 = (W - cw) / 2;
+      const rightW = clamp(cw * 0.42, 300, 580);
+      bs = clamp(H * 0.075, 48, 64);
+      lay.R = clamp(Math.min((rightW - 40) / 2, (rightW / 2 - bs / 2 - 10) * SQ - bs / 2 - 8, (H - 36) / 2.45), 86, 200);
+      lay.cx = x0 + cw - rightW / 2 - 8;
+      lay.ph = clamp(lay.R * 0.3, 32, 50);
+      lay.cy = Math.min(H - lay.R - 12, Math.max(lay.R + lay.ph + 22, (H + lay.ph + 10) / 2));
+      gx0 = x0 + 22;
+      gy0 = 16;
+      gw = cw - rightW - 40;
+      gh = H - 32;
     } else {
-      lay.R = clamp(Math.min(colW / 2 - 72, H * 0.19), 88, 150);
+      const colW = Math.min(W, 600);
+      const x0 = (W - colW) / 2;
+      bs = clamp(W * 0.14, 50, 62);
+      lay.R = clamp(Math.min((colW / 2 - bs / 2 - 8) * SQ - bs / 2 - 6, H * 0.205), 96, 185);
       lay.cx = W / 2;
-      lay.cy = H - lay.R - 22;
-      lay.pillY = lay.cy - lay.R - 30;
-      gx0 = x0 + 16;
-      gy0 = 8;
-      gw = colW - 32;
-      gh = lay.pillY - 30 - gy0;
+      lay.ph = clamp(lay.R * 0.3, 32, 50);
+      lay.cy = H - Math.max(lay.R + 18, lay.R / SQ + bs / 2 + bs * 0.55 + 14);
+      gx0 = x0 + 12;
+      gy0 = 10;
+      gw = colW - 24;
+      gh = lay.cy - lay.R - lay.ph - 30 - gy0;
     }
-    const gap = 0.12;
-    lay.cs = Math.min(gw / (lv.W + (lv.W - 1) * gap), gh / (lv.H + (lv.H - 1) * gap), 64);
+    lay.pillY = lay.cy - lay.R - lay.ph / 2 - 12;
+    const gap = 0.1;
+    lay.cs = Math.min(gw / (lv.W + (lv.W - 1) * gap), gh / (lv.H + (lv.H - 1) * gap), wide ? 96 : 78);
     lay.gap = lay.cs * gap;
     const tw = lv.W * lay.cs + (lv.W - 1) * lay.gap;
     const th = lv.H * lay.cs + (lv.H - 1) * lay.gap;
@@ -151,16 +156,33 @@ export function playCengel(root, nav, li) {
       cell.x = lay.gx + cell.c * (lay.cs + lay.gap) + lay.cs / 2;
       cell.y = lay.gy + cell.r * (lay.cs + lay.gap) + lay.cs / 2;
     }
-    lay.lr = lay.R * 0.2;
-    const rr = lay.R * (n > 6 ? 0.66 : 0.62);
+    lay.lr = lay.R * (n > 6 ? 0.19 : 0.21);
+    lay.font = lay.R * (n > 6 ? 0.31 : n > 5 ? 0.34 : 0.37);
+    const rr = lay.R * (n > 6 ? 0.68 : 0.64);
     lay.ring = pool.map((_, i) => {
       const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
       return { x: lay.cx + Math.cos(a) * rr, y: lay.cy + Math.sin(a) * rr };
     });
-    // Yan düğmeler çarkın iki yanına oturur
+    // Düğmeler: sol üst kavanoz, sol alt ekstralar, sağ üst ipucu, sağ alt arı
+    const off = (lay.R + bs * 0.55) / SQ;
+    atEls.forEach((el, i) => {
+      const x = clamp(lay.cx + (i < 2 ? -off : off), bs / 2 + 6, W - bs / 2 - 6);
+      const y = lay.cy + (i % 2 ? off * 1.02 : -off);
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+    });
     stageEl.style.setProperty('--wy', `${lay.cy}px`);
     stageEl.style.setProperty('--wx', `${lay.cx}px`);
-    stageEl.style.setProperty('--wr', `${lay.R}px`);
+    lay.bs = bs;
+    // Yardım arısının dinlenme yeri: çarkın sağı, sığmazsa solu, o da olmazsa arı düğmesinin üstü
+    const bz = Math.max(11, lay.cs * 0.42);
+    lay.bz = bz;
+    const gridR = lay.gx + tw;
+    if (lay.cx + lay.R + bz * 2.05 <= W - 4) lay.home = { x: lay.cx + lay.R + bz * 0.95, y: lay.cy };
+    else if (wide && lay.cx - lay.R - bz * 2.05 >= gridR + 8) lay.home = { x: lay.cx - lay.R - bz * 0.95, y: lay.cy };
+    else lay.home = { x: Math.min(lay.cx + off, W - bs / 2 - 6), y: lay.cy + off * 1.02 - bs / 2 - bz * 0.55 };
+    stageEl.style.setProperty('--bs', `${bs}px`);
+    stageEl.style.setProperty('--sh', `${clamp(lay.R * 0.3, 40, 58)}px`);
   }
   relayout();
   game.aFrom = lay.ring.map(() => ({ x: lay.cx, y: lay.cy }));
@@ -462,12 +484,19 @@ export function playCengel(root, nav, li) {
       const lit = clueKeys && clueKeys.includes(key) && !cell.shown;
       if (cell.shown) {
         tile(g, cell.x, cell.y + wy, s, grad);
-        label(g, cell.x, cell.y + wy + s * 0.04, trUpper(cell.ch), { size: s * 0.62, color: '#fff', stroke: NONE, sw: 0, font: FONT });
+        label(g, cell.x, cell.y + wy + s * 0.04, trUpper(cell.ch), { size: s * 0.64, color: '#fff', stroke: NONE, sw: 0, font: FONT });
       } else if (cell.hint) {
         tile(g, cell.x, cell.y, s, '#ffffff');
-        label(g, cell.x, cell.y + s * 0.04, trUpper(cell.ch), { size: s * 0.62, color: d.accent2, stroke: NONE, sw: 0, font: FONT });
+        label(g, cell.x, cell.y + s * 0.04, trUpper(cell.ch), { size: s * 0.64, color: d.accent2, stroke: NONE, sw: 0, font: FONT });
       } else {
-        tile(g, cell.x, cell.y, s, lit ? `rgba(255,255,255,${0.86 + Math.sin(t / 180) * 0.1})` : 'rgba(255,255,255,.72)', 'rgba(40,30,70,.10)');
+        tile(g, cell.x, cell.y, s, lit ? `rgba(255,255,255,${0.86 + Math.sin(t / 180) * 0.1})` : 'rgba(255,255,255,.8)', 'rgba(40,30,70,.13)');
+        // Karlı ya da açık zeminde de seçilsin diye ince renkli kenar
+        rrect(g, cell.x - s / 2 + 0.75, cell.y - s / 2 + 0.75, s - 1.5, s - 1.5, s * 0.24);
+        g.strokeStyle = d.accent;
+        g.globalAlpha = 0.28;
+        g.lineWidth = 1.5;
+        g.stroke();
+        g.globalAlpha = 1;
         if (lit) {
           rrect(g, cell.x - s / 2 - 2, cell.y - s / 2 - 2, s + 4, s + 4, s * 0.28);
           g.strokeStyle = d.accent;
@@ -485,13 +514,8 @@ export function playCengel(root, nav, li) {
     g.fill();
     g.beginPath();
     g.arc(lay.cx, lay.cy, R, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(255,255,255,.9)';
+    g.fillStyle = 'rgba(255,255,255,.96)';
     g.fill();
-    // Ortada silik petek izi
-    hexPath(g, lay.cx, lay.cy, R * 0.16);
-    g.strokeStyle = 'rgba(40,30,70,.1)';
-    g.lineWidth = 2;
-    g.stroke();
     const sel = game.sel;
     const w = curWord();
     const kind = kindNow(w);
@@ -517,7 +541,7 @@ export function playCengel(root, nav, li) {
         g.fillStyle = d.accent;
         g.fill();
       }
-      label(g, p.x, p.y + lay.lr * 0.08, trUpper(letterAt(i)), { size: lay.lr * 1.55, color: on ? '#fff' : d.ink, stroke: NONE, sw: 0, font: FONT });
+      label(g, p.x, p.y + lay.font * 0.05, trUpper(letterAt(i)), { size: lay.font, color: on ? '#fff' : d.ink, stroke: NONE, sw: 0, font: FONT });
     }
 
     /* Kelime hapı */
@@ -532,15 +556,16 @@ export function playCengel(root, nav, li) {
     }
     if (text) {
       g.globalAlpha = alpha;
-      g.font = `800 ${Math.round(R * 0.2)}px ${FONT}`;
-      const tw = g.measureText(text).width + R * 0.36;
-      const ph = R * 0.32;
+      const pf = lay.ph * 0.6;
+      g.font = `800 ${Math.round(pf)}px ${FONT}`;
+      const tw = g.measureText(text).width + lay.ph * 1.1;
+      const ph = lay.ph;
       const shk = pk === 'no' ? Math.sin(t / 24) * 4 * alpha : 0;
       const col = pk === 'ok' ? '#2fbf86' : pk === 'extra' ? '#3a9be0' : pk === 'no' ? '#e5566d' : pk === 'used' ? '#c9a227' : d.accent;
       rrect(g, lay.cx - tw / 2 + shk, lay.pillY - ph / 2, tw, ph, ph / 2);
       g.fillStyle = col;
       g.fill();
-      label(g, lay.cx + shk, lay.pillY + ph * 0.04, text, { size: R * 0.2, color: '#fff', stroke: NONE, sw: 0, font: FONT });
+      label(g, lay.cx + shk, lay.pillY + ph * 0.04, text, { size: pf, color: '#fff', stroke: NONE, sw: 0, font: FONT });
       g.globalAlpha = 1;
     }
 
@@ -560,14 +585,14 @@ export function playCengel(root, nav, li) {
       const y = lerp(f.y, f.cell.y, e) - Math.sin(f.t * Math.PI) * cs * 1.2;
       const s = lerp(lay.lr * 1.6, cs, e);
       tile(g, x, y, s, grad);
-      label(g, x, y + s * 0.04, trUpper(f.c), { size: s * 0.62, color: '#fff', stroke: NONE, sw: 0, font: FONT });
+      label(g, x, y + s * 0.04, trUpper(f.c), { size: s * 0.64, color: '#fff', stroke: NONE, sw: 0, font: FONT });
       return true;
     });
 
     /* Yardım arısı */
     const bee = game.bee;
     const task = game.beeTask;
-    const home = { x: lay.cx + R * 0.9, y: lay.cy - R * 1.05 };
+    const home = lay.home;
     const tx = task ? task.cell.x : home.x;
     const ty = task ? task.cell.y - cs * 0.9 : home.y;
     if (!bee.x) { bee.x = home.x; bee.y = home.y; }
@@ -588,7 +613,7 @@ export function playCengel(root, nav, li) {
       completeOthers();
     }
     if (task || game.found < game.total) {
-      const bs = Math.max(11, cs * 0.42);
+      const bs = lay.bz;
       drawBee(g, bee.x, bee.y + Math.sin(t / 160) * 3, bs, t, bee.ang);
       if (task) {
         g.save();

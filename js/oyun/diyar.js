@@ -1,130 +1,181 @@
 // Çengel Bulmaca'nın yolculuğu: her on bölüm Türkiye'den bir manzara. Arılar çiçek peşinde
-// lavanta tarlalarından Ağrı'nın eteklerine gider. Manzaralar yumuşak katmanlı SVG resimlerdir.
+// lavanta tarlalarından Ağrı'nın eteklerine gider. Manzaralar durgun, katmanlı SVG resimlerdir:
+// uzak katmanlar soluk, yakınlar doygun; hiçbir şey kıpırdamaz ki göz yorulmasın.
+// Tuval 600x600: ekran yan da dursa dik de dursa ufuk çizgisi (y=330 civarı) görünür kalır.
 
-const g = (id, a, b, x2 = 0, y2 = 1) => `<linearGradient id="${id}" x1="0" y1="0" x2="${x2}" y2="${y2}"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`;
-const cloud = (x, y, s, o = 0.9, d = 70) => `<g class="dy-cloud" style="animation-duration:${d}s;animation-delay:${-x / 4}s"><g transform="translate(${x} ${y}) scale(${s})" opacity="${o}" fill="#fff"><ellipse cx="0" cy="0" rx="34" ry="12"/><ellipse cx="-18" cy="4" rx="20" ry="10"/><ellipse cx="20" cy="3" rx="22" ry="10"/><ellipse cx="2" cy="-8" rx="18" ry="11"/></g></g>`;
-const sun = (x, y, r, c = '#fff1b8') => `<circle cx="${x}" cy="${y}" r="${r * 2.4}" fill="${c}" opacity=".25"/><circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`;
-const birds = (x, y) => `<g class="dy-birds" fill="none" stroke="#3d3550" stroke-width="1.6" stroke-linecap="round" opacity=".55"><path d="M${x} ${y} q5 -4 10 0 q5 -4 10 0"/><path d="M${x + 26} ${y + 10} q4 -3 8 0 q4 -3 8 0"/></g>`;
-const pine = (x, y, s, c) => `<g transform="translate(${x} ${y}) scale(${s})" fill="${c}"><path d="M0 -40 L13 -14 H5 L16 6 H-16 L-5 -14 H-13z"/><rect x="-2" y="6" width="4" height="7" fill="#6b4a33"/></g>`;
+const lg = (id, stops, x2 = 0, y2 = 1) => `<linearGradient id="${id}" x1="0" y1="0" x2="${x2}" y2="${y2}">${stops.map(([o, c, a = 1]) => `<stop offset="${o}" stop-color="${c}" stop-opacity="${a}"/>`).join('')}</linearGradient>`;
+const rg = (id, c, a = 0.6) => `<radialGradient id="${id}"><stop offset="0" stop-color="${c}" stop-opacity="${a}"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></radialGradient>`;
+
+// Yumuşak sırt çizgisi: aynı tohumla hep aynı çıkar
+function ridge(base, amp, seed, fill, { freq = 1, bottom = 640, op = 1 } = {}) {
+  const pts = [];
+  for (let x = -60; x <= 660; x += 30) {
+    const y = base - amp * (0.55 * Math.sin((x / 95) * freq + seed) + 0.3 * Math.sin((x / 41) * freq + seed * 2.1) + 0.15 * Math.sin(x / 23 + seed * 3.7));
+    pts.push([x, y]);
+  }
+  let d = `M-60 ${bottom} L${pts[0][0]} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i];
+    const [x1, y1] = pts[i + 1];
+    d += ` Q${x0} ${y0.toFixed(1)} ${(x0 + x1) / 2} ${((y0 + y1) / 2).toFixed(1)}`;
+  }
+  return `<path d="${d} L660 ${bottom}Z" fill="${fill}" opacity="${op}"/>`;
+}
+const glow = (x, y, r, id) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#${id})"/>`;
+const cloud = (x, y, s, o = 0.75) => `<g transform="translate(${x} ${y}) scale(${s})" fill="#fff" opacity="${o}"><ellipse cx="0" cy="0" rx="46" ry="13"/><ellipse cx="-22" cy="-6" rx="24" ry="12"/><ellipse cx="18" cy="-10" rx="26" ry="15"/></g>`;
+const haze = (id, y0, y1, c = '#ffffff', a = 0.55) => `<defs>${lg(id, [[0, c, 0], [0.62, c, a], [1, c, 0]])}</defs><rect x="-10" y="${y0}" width="620" height="${y1 - y0}" fill="url(#${id})"/>`;
+const spruce = (x, y, s, c) => `<path d="M${x} ${y - 46 * s} L${x + 9 * s} ${y - 28 * s} L${x + 5 * s} ${y - 28 * s} L${x + 13 * s} ${y - 12 * s} L${x + 8 * s} ${y - 12 * s} L${x + 16 * s} ${y} L${x - 16 * s} ${y} L${x - 8 * s} ${y - 12 * s} L${x - 13 * s} ${y - 12 * s} L${x - 5 * s} ${y - 28 * s} L${x - 9 * s} ${y - 28 * s}Z" fill="${c}"/>`;
+const roundTree = (x, y, s, c1, c2, trunk = '#7a5a44') => `<rect x="${x - 2.5 * s}" y="${y - 18 * s}" width="${5 * s}" height="${18 * s}" fill="${trunk}"/><ellipse cx="${x}" cy="${y - 28 * s}" rx="${20 * s}" ry="${17 * s}" fill="${c1}"/><ellipse cx="${x - 6 * s}" cy="${y - 33 * s}" rx="${11 * s}" ry="${9 * s}" fill="${c2}"/>`;
 
 export const DIYAR = [
   {
     id: 'lavanta', name: 'Lavanta Tarlası', place: 'Isparta',
     text: 'Temmuzda Kuyucak köyünün yamaçları mosmor olur. Arılar için en kokulu durak burası.',
-    accent: '#8e6cd8', accent2: '#6f4fc0', ink: '#3b2c5c',
-    svg: () => `<defs>${g('s1', '#d9cdf7', '#fff3e4')}${g('h1', '#b7a3e6', '#9c86d8')}${g('f1', '#9a7ee0', '#6f52c4')}</defs>
-      <rect width="400" height="600" fill="url(#s1)"/>${sun(300, 120, 34)}${cloud(60, 90, 1)}${cloud(250, 60, 0.7, 0.8, 90)}${birds(150, 130)}
-      <path d="M0 250 Q100 200 210 238 T400 222 V600 H0z" fill="url(#h1)" opacity=".7"/>
-      <path d="M0 290 Q120 250 240 282 T400 270 V600 H0z" fill="#c6dca0"/>
-      ${Array.from({ length: 11 }, (_, i) => `<path class="dy-sway" style="animation-delay:${-i * 0.3}s" d="M${200 + (i - 5) * 6} 292 L${-60 + i * 52} 600 L${-30 + i * 52} 600 L${203 + (i - 5) * 6} 292z" fill="url(#f1)" opacity="${0.75 + (i % 2) * 0.25}"/>`).join('')}
-      <g transform="translate(320 286)"><rect x="-3" y="-30" width="6" height="30" fill="#7a5a44"/><circle cx="0" cy="-40" r="20" fill="#6f9a52"/><circle cx="-12" cy="-32" r="12" fill="#7eab5f"/></g>`,
+    accent: '#8466d0', accent2: '#6a4cb8', ink: '#352a54',
+    svg: () => {
+      // Lavanta öbekleri: sıra sıra çizgi yerine tepelere serpilmiş yuvarlak çalılar
+      const bush = (x, y, s, c1, c2) => `<path d="M${x - 18 * s} ${y + 3 * s} Q${x - 17 * s} ${y - 11 * s} ${x} ${y - 12 * s} Q${x + 17 * s} ${y - 11 * s} ${x + 18 * s} ${y + 3 * s}Z" fill="${c1}"/><path d="M${x - 12 * s} ${y - 5 * s} Q${x - 8 * s} ${y - 10.5 * s} ${x + 2 * s} ${y - 10.5 * s}" stroke="${c2}" stroke-width="${2.4 * s}" stroke-linecap="round" fill="none"/>`;
+      const rowOf = (y0, n, s, c1, c2, seed) => Array.from({ length: n }, (_, i) => bush(-30 + i * (680 / n) + ((i * 53 + seed * 29) % 23), y0 + ((i * 37 + seed * 17) % 22), s, c1, c2)).join('');
+      return `<defs>${lg('lsk', [[0, '#cdbdf0'], [0.45, '#f1e0f0'], [0.58, '#ffeadb']])}${rg('lsn', '#fff3d6', 0.9)}${lg('lh1', [[0, '#c6b6e8'], [1, '#b7a6e0']])}${lg('lh2', [[0, '#b6a0e4'], [1, '#a28ad8']])}${lg('lh3', [[0, '#a68ddc'], [1, '#9378d0']])}</defs>
+      <rect width="600" height="600" fill="url(#lsk)"/>${glow(400, 300, 170, 'lsn')}<circle cx="400" cy="300" r="34" fill="#fff6e2"/>
+      ${cloud(150, 150, 1.2, 0.6)}${cloud(460, 110, 0.9, 0.5)}
+      ${ridge(302, 20, 1.2, '#cdbfe6')}${ridge(320, 12, 2.6, '#b9c6a6')}
+      ${roundTree(470, 336, 1.1, '#7f9f62', '#93b375')}${roundTree(500, 340, 0.7, '#7f9f62', '#93b375')}
+      <path d="M118 336 h40 v-18 l-20 -12 l-20 12z" fill="#efe2d2"/><path d="M114 318 l24 -14 l24 14z" fill="#b8735a"/>
+      ${ridge(352, 14, 0.7, 'url(#lh1)')}${rowOf(362, 18, 0.9, '#b29be0', '#c4b2ea', 1)}
+      ${ridge(410, 18, 2.9, 'url(#lh2)')}${rowOf(424, 13, 1.5, '#9b82d8', '#b29de4', 2)}
+      ${ridge(486, 20, 4.4, 'url(#lh3)')}${rowOf(506, 9, 2.4, '#8a6fcd', '#a48ade', 3)}
+      ${haze('lhz', 320, 380, '#f6e8f4', 0.45)}`;
+    },
   },
   {
     id: 'kapadokya', name: 'Peri Bacaları', place: 'Kapadokya',
     text: 'Şafakta yüzlerce balon havalanır. Vadilerdeki kayısı bahçeleri arıların sabah sofrası.',
-    accent: '#e07a4f', accent2: '#c9603a', ink: '#4a2c22',
-    svg: () => `<defs>${g('s2', '#ffc8a8', '#fff1df')}${g('r2', '#f0c79a', '#d9a16f')}${g('r3', '#e3b384', '#c98f5e')}</defs>
-      <rect width="400" height="600" fill="url(#s2)"/>${sun(90, 170, 30, '#fff4d1')}
-      ${[[70, 110, '#ff7a6b', '#ffd36b'], [200, 70, '#5fb6e8', '#ffe27a'], [310, 140, '#ffb347', '#e86a8a'], [140, 190, '#7ed6a8', '#fff']].map(([x, y, a, b], i) => `<g class="dy-balloon" style="animation-delay:${-i * 1.3}s"><g transform="translate(${x} ${y}) scale(${1 - i * 0.12})"><path d="M0 -26 C18 -26 22 -6 12 8 L5 18 H-5 L-12 8 C-22 -6 -18 -26 0 -26z" fill="${a}"/><path d="M0 -26 C7 -20 7 4 3 18 H-3 C-7 4 -7 -20 0 -26z" fill="${b}" opacity=".8"/><rect x="-5" y="22" width="10" height="7" rx="2" fill="#8a5a33"/><path d="M-5 18 L-4 22 M5 18 L4 22" stroke="#8a5a33"/></g></g>`).join('')}
-      <path d="M0 300 Q100 270 200 296 T400 286 V600 H0z" fill="#ead2b0"/>
-      ${[[40, 340, 30, 120], [100, 330, 24, 150], [165, 345, 34, 110], [250, 335, 26, 160], [320, 340, 32, 125], [372, 350, 22, 100]].map(([x, y, w, h], i) => `<g fill="url(#${i % 2 ? 'r2' : 'r3'})"><path d="M${x - w} ${y + 140} C${x - w} ${y + 40} ${x - w * 0.5} ${y - h + 70} ${x} ${y - h + 50} C${x + w * 0.5} ${y - h + 70} ${x + w} ${y + 40} ${x + w} ${y + 140}z"/><ellipse cx="${x}" cy="${y - h + 46}" rx="${w * 0.55}" ry="${w * 0.28}" fill="#8f6a52"/><ellipse cx="${x - w * 0.3}" cy="${y - 20}" rx="3" ry="5" fill="#7a5340" opacity=".6"/></g>`).join('')}
-      <path d="M0 470 Q200 440 400 470 V600 H0z" fill="#d8b38a"/>`,
+    accent: '#d9734a', accent2: '#bd5a34', ink: '#4a2c22',
+    svg: () => {
+      const chim = (x, y, w, h, c1, c2) => `<path d="M${x - w} ${y} C${x - w} ${y - h * 0.55} ${x - w * 0.45} ${y - h} ${x} ${y - h} C${x + w * 0.45} ${y - h} ${x + w} ${y - h * 0.55} ${x + w} ${y}Z" fill="${c1}"/><path d="M${x} ${y - h} C${x + w * 0.45} ${y - h} ${x + w} ${y - h * 0.55} ${x + w} ${y} L${x + w * 0.2} ${y} C${x + w * 0.35} ${y - h * 0.5} ${x + w * 0.2} ${y - h * 0.85} ${x} ${y - h}Z" fill="${c2}"/><ellipse cx="${x}" cy="${y - h + 2}" rx="${w * 0.62}" ry="${w * 0.3}" fill="#9a7058"/>`;
+      const balloon = (x, y, s, a, b) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -30 C22 -30 26 -6 13 10 L6 20 H-6 L-13 10 C-26 -6 -22 -30 0 -30Z" fill="${a}"/><path d="M0 -30 C9 -24 8 4 3 20 H-3 C-8 4 -9 -24 0 -30Z" fill="${b}"/><rect x="-5" y="24" width="10" height="7" rx="2" fill="#8a5a33"/><path d="M-6 20 L-4 24 M6 20 L4 24" stroke="#8a5a33" stroke-width="1.2"/></g>`;
+      return `<defs>${lg('ksk', [[0, '#ffc6ad'], [0.5, '#ffe2cc'], [0.6, '#fff1e2']])}${rg('ksn', '#fff4d4', 0.9)}${lg('kfl', [[0, '#e8c19a'], [1, '#d3a27a']])}</defs>
+        <rect width="600" height="600" fill="url(#ksk)"/>${glow(170, 310, 160, 'ksn')}<circle cx="170" cy="310" r="30" fill="#fff4dc"/>
+        ${balloon(250, 150, 1.4, '#ef8a72', '#ffd38a')}${balloon(370, 210, 1.1, '#6fb7e0', '#ffe6a0')}${balloon(440, 120, 0.8, '#f2a65a', '#e98aa0')}${balloon(190, 230, 0.7, '#8bd0a8', '#fff4dc')}${balloon(510, 240, 0.6, '#c99ee6', '#fff')}
+        ${ridge(320, 10, 0.8, '#efcfb1')}
+        ${chim(140, 380, 26, 110, '#ecc6a0', '#d7a780')}${chim(200, 372, 20, 80, '#f0cca7', '#dcae87')}${chim(330, 388, 30, 130, '#ecc6a0', '#d7a780')}${chim(410, 376, 22, 92, '#f0cca7', '#dcae87')}${chim(470, 384, 26, 116, '#ecc6a0', '#d7a780')}
+        ${ridge(380, 8, 2.2, 'url(#kfl)')}${haze('khz', 330, 400, '#fff1e2', 0.35)}`;
+    },
   },
   {
     id: 'pamukkale', name: 'Beyaz Basamaklar', place: 'Pamukkale',
     text: 'Bembeyaz travertenlerde turkuaz havuzlar. Çevresindeki narenciye çiçekleri bahar bayramı.',
-    accent: '#22a9b8', accent2: '#13889a', ink: '#163c45',
-    svg: () => `<defs>${g('s3', '#9fdcf5', '#effaff')}${g('w3', '#8fe1ea', '#46c2d3')}</defs>
-      <rect width="400" height="600" fill="url(#s3)"/>${sun(320, 100, 28)}${cloud(90, 110, 1.1)}${cloud(280, 170, 0.8, 0.8, 85)}
-      <path d="M0 230 Q120 200 240 222 T400 210 V600 H0z" fill="#b9d6a6"/>
-      ${Array.from({ length: 7 }, (_, i) => { const y = 250 + i * 50; const w = 140 + i * 40; return `<path d="M${200 - w} ${y} Q${200 - w * 0.6} ${y - 18} 200 ${y - 12} Q${200 + w * 0.6} ${y - 18} ${200 + w} ${y} L${200 + w + 10} ${y + 34} H${190 - w}z" fill="#ffffff"/><path class="dy-shine" style="animation-delay:${-i * 0.5}s" d="M${210 - w * 0.9} ${y + 2} Q200 ${y - 8} ${190 + w * 0.9} ${y + 2} L${190 + w * 0.88} ${y + 18} Q200 ${y + 10} ${210 - w * 0.88} ${y + 18}z" fill="url(#w3)"/>`; }).join('')}`,
+    accent: '#1fa3b4', accent2: '#118596', ink: '#163c45',
+    svg: () => `<defs>${lg('psk', [[0, '#a6d8f4'], [0.55, '#e3f4fd']])}${lg('pw', [[0, '#c4f0f2'], [1, '#86d6de']])}${lg('pl', [[0, '#ffffff'], [1, '#e4eef2']])}</defs>
+      <rect width="600" height="600" fill="url(#psk)"/>${cloud(170, 130, 1.3, 0.7)}${cloud(450, 180, 1, 0.55)}
+      ${ridge(290, 18, 1.7, '#b6d3b0')}${ridge(306, 10, 3.1, '#a4c69d')}
+      ${Array.from({ length: 4 }, (_, i) => {
+        const y = 324 + i * 74;
+        const w = 170 + i * 110;
+        return `<path d="M${300 - w} ${y + 22} Q${300 - w * 0.55} ${y - 8} 300 ${y - 4} Q${300 + w * 0.55} ${y - 8} ${300 + w} ${y + 22} L${300 + w + 14} ${y + 80} L${286 - w} ${y + 80}Z" fill="url(#pl)"/><path d="M${318 - w * 0.88} ${y + 18} Q300 ${y + 4} ${282 + w * 0.88} ${y + 18} Q300 ${y + 30} ${318 - w * 0.88} ${y + 18}Z" fill="url(#pw)" opacity=".92"/>`;
+      }).join('')}`,
   },
   {
     id: 'yayla', name: 'Sisli Yayla', place: 'Karadeniz',
     text: 'Bulutların arasında yeşil yaylalar. Kestane ve ıhlamur balının memleketi.',
-    accent: '#2f9e6a', accent2: '#1f7d52', ink: '#1d3a2c',
-    svg: () => `<defs>${g('s4', '#cfe6e4', '#f5fbf7')}</defs>
-      <rect width="400" height="600" fill="url(#s4)"/>
-      <path d="M0 210 L80 130 L150 190 L230 110 L320 180 L400 140 V600 H0z" fill="#9cc7b4"/>
-      <rect class="dy-fog" y="170" width="400" height="40" fill="#fff" opacity=".55"/>
-      <path d="M0 270 Q90 220 180 256 T400 240 V600 H0z" fill="#6fb38a"/>
-      ${[30, 60, 330, 360, 385].map((x, i) => pine(x, 262 + (i % 2) * 8, 1.1, '#3f8a62')).join('')}
-      <rect class="dy-fog dy-fog2" y="250" width="400" height="34" fill="#fff" opacity=".45"/>
-      <path d="M0 330 Q120 300 240 322 T400 310 V600 H0z" fill="#58a274"/>
-      <g transform="translate(250 318)"><rect x="-26" y="-26" width="52" height="26" fill="#a26a42"/><path d="M-32 -26 L0 -48 L32 -26z" fill="#6b3f2a"/><rect x="-6" y="-16" width="12" height="16" fill="#5a3522"/><rect x="-20" y="-20" width="9" height="8" fill="#ffe7a8"/></g>
-      ${pine(120, 330, 1.4, '#2f7a52')}${pine(150, 338, 1.1, '#3a8a5e')}`,
+    accent: '#2e9466', accent2: '#1f7550', ink: '#1d3a2c',
+    svg: () => `<defs>${lg('ysk', [[0, '#d3e5e1'], [0.6, '#f3f8f4']])}</defs>
+      <rect width="600" height="600" fill="url(#ysk)"/>
+      ${ridge(250, 46, 0.6, '#b9d4c8', { freq: 0.7 })}${haze('yh1', 230, 300)}
+      ${ridge(290, 34, 2.1, '#94bfa8', { freq: 0.8 })}${haze('yh2', 280, 340, '#ffffff', 0.6)}
+      ${ridge(328, 22, 3.4, '#6fa886')}
+      ${[60, 92, 128, 438, 470, 506, 540].map((x, i) => spruce(x, 338 + (i % 3) * 6, 1.2 + (i % 2) * 0.3, '#3f7d5c')).join('')}
+      ${haze('yh3', 320, 372, '#ffffff', 0.45)}
+      ${ridge(372, 14, 5.2, '#5a9a72')}
+      <g transform="translate(330 382)"><rect x="-34" y="-30" width="68" height="30" fill="#a8704a"/><path d="M-40 -30 L0 -56 L40 -30Z" fill="#6e4430"/><rect x="-8" y="-18" width="16" height="18" fill="#5b3725"/><rect x="-26" y="-23" width="11" height="9" fill="#ffe7a8"/><rect x="15" y="-23" width="11" height="9" fill="#ffe7a8"/></g>
+      ${spruce(220, 396, 1.8, '#2f6e4c')}${spruce(250, 400, 1.3, '#3a7e58')}${spruce(420, 404, 1.6, '#2f6e4c')}`,
   },
   {
     id: 'ege', name: 'Zeytin Koyu', place: 'Ege',
     text: 'Gümüş yapraklı zeytinler, masmavi koy. Kekik kokan tepeler arıların yaz durağı.',
-    accent: '#3d86d6', accent2: '#2a68b4', ink: '#1d3352',
-    svg: () => `<defs>${g('s5', '#a9d8ff', '#f4fbff')}${g('e5', '#4aa3e6', '#2f7cc8')}</defs>
-      <rect width="400" height="600" fill="url(#s5)"/>${sun(80, 90, 26)}${cloud(260, 80, 0.9)}${birds(210, 150)}
-      <rect y="220" width="400" height="90" fill="url(#e5)"/>
-      <path class="dy-shine" d="M40 250 h60 M150 270 h80 M280 240 h70 M60 290 h50" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".5"/>
-      <path d="M300 230 Q340 200 400 214 V240 H300z" fill="#9ab88a"/>
-      <g fill="#fff">${[[322, 226], [340, 222], [358, 224], [376, 220]].map(([x, y]) => `<rect x="${x}" y="${y - 10}" width="12" height="10"/><path d="M${x - 1} ${y - 10} h14 l-7 -5z" fill="#d9744a"/>`).join('')}</g>
-      <path d="M0 300 Q120 280 230 300 T400 296 V600 H0z" fill="#c9cf93"/>
-      ${[[70, 360], [180, 340], [300, 370], [120, 430], [260, 450], [360, 420]].map(([x, y], i) => `<g class="dy-sway" style="animation-delay:${-i * 0.6}s" transform="translate(${x} ${y})"><path d="M-3 0 Q-6 -20 -2 -34 L3 -34 Q6 -18 4 0z" fill="#7a6044"/><ellipse cx="0" cy="-44" rx="30" ry="16" fill="#8fa77a"/><ellipse cx="-14" cy="-38" rx="16" ry="10" fill="#a7bd92"/><ellipse cx="14" cy="-52" rx="15" ry="9" fill="#a7bd92"/></g>`).join('')}`,
+    accent: '#3a83d2', accent2: '#2665b0', ink: '#1d3352',
+    svg: () => `<defs>${lg('esk', [[0, '#9fd0f5'], [0.5, '#e9f6ff']])}${lg('esea', [[0, '#7fbdeb'], [1, '#2f7cc4']])}${lg('ehl', [[0, '#c9cf98'], [1, '#a9b27a']])}</defs>
+      <rect width="600" height="600" fill="url(#esk)"/>${cloud(140, 120, 1.1, 0.6)}${cloud(420, 90, 0.8, 0.5)}
+      <path d="M380 300 Q440 268 520 286 Q570 292 620 300Z" fill="#b8c4cf"/><path d="M-20 302 Q60 284 130 300Z" fill="#c4ccd6"/>
+      <rect x="-10" y="300" width="620" height="90" fill="url(#esea)"/>
+      <path d="M120 322 h70 M260 340 h90 M420 318 h60 M200 364 h60" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".35"/>
+      ${ridge(392, 16, 1.4, 'url(#ehl)')}
+      <g>${[[440, 372], [462, 366], [484, 372], [506, 364], [528, 370]].map(([x, y]) => `<rect x="${x - 9}" y="${y - 14}" width="18" height="14" fill="#fbf8f2"/><path d="M${x - 11} ${y - 14} L${x} ${y - 21} L${x + 11} ${y - 14}Z" fill="#cf7a52"/>`).join('')}</g>
+      ${[[90, 420, 1.3], [200, 404, 1], [310, 426, 1.4], [150, 470, 1.6], [400, 456, 1.2], [520, 480, 1.5]].map(([x, y, s]) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-3 0 Q-6 -16 -2 -26 L3 -26 Q6 -14 4 0Z" fill="#7d6448"/><ellipse cx="0" cy="-34" rx="24" ry="13" fill="#93a983"/><ellipse cx="-10" cy="-30" rx="13" ry="8" fill="#aabd9a"/><ellipse cx="10" cy="-40" rx="12" ry="7" fill="#aabd9a"/></g>`).join('')}`,
   },
   {
     id: 'uludag', name: 'Karlı Doruk', place: 'Uludağ',
     text: 'Zirvede kar, eteklerde çam ormanı. Çam balı tam burada, ağaçların tatlı özünden gelir.',
-    accent: '#4f86d8', accent2: '#3567b8', ink: '#1f2f4f',
-    svg: () => `<defs>${g('s6', '#bcd6f5', '#f6f9ff')}</defs>
-      <rect width="400" height="600" fill="url(#s6)"/>${cloud(320, 70, 0.9)}
-      <path d="M0 260 L110 120 L170 180 L240 90 L330 190 L400 150 V600 H0z" fill="#9db4d6"/>
-      <path d="M110 120 L135 152 L118 150 L100 166 L88 148z M240 90 L272 132 L252 128 L236 146 L222 124 L212 128z" fill="#fff"/>
-      <path d="M0 300 Q100 260 200 290 T400 280 V600 H0z" fill="#e9f0fa"/>
-      ${Array.from({ length: 12 }, (_, i) => pine(i * 36 + 10, 320 + (i % 3) * 14, 1 + (i % 2) * 0.3, i % 2 ? '#2f6a55' : '#3a7c62')).join('')}
-      <path d="M0 380 Q200 350 400 380 V600 H0z" fill="#f2f6fc"/>
-      ${Array.from({ length: 24 }, (_, i) => `<circle class="dy-snow" style="animation-delay:${-i * 0.37}s;animation-duration:${6 + (i % 5)}s" cx="${(i * 47) % 400}" cy="-10" r="${1.5 + (i % 3)}" fill="#fff"/>`).join('')}`,
+    accent: '#4a80d4', accent2: '#3462b4', ink: '#1f2f4f',
+    svg: () => `<defs>${lg('usk', [[0, '#b4cff0'], [0.55, '#eef4ff']])}${lg('usn', [[0, '#ffffff'], [1, '#e2eaf6']])}</defs>
+      <rect width="600" height="600" fill="url(#usk)"/>${cloud(470, 130, 1, 0.6)}
+      <path d="M-20 320 L120 190 L180 240 L280 150 L380 250 L460 200 L620 320Z" fill="#a9bde0"/>
+      <path d="M120 190 L146 216 L130 214 L112 230 L100 210Z M280 150 L318 192 L296 188 L280 206 L262 186 L248 190Z M460 200 L486 226 L468 222 L452 234 L440 220Z" fill="#fff"/>
+      ${haze('uh1', 250, 330, '#ffffff', 0.6)}
+      ${ridge(336, 12, 2.4, 'url(#usn)')}
+      ${Array.from({ length: 16 }, (_, i) => spruce(i * 40 + 10, 350 + (i % 3) * 8, 1.1 + (i % 2) * 0.35, i % 2 ? '#2f6658' : '#3b7867')).join('')}
+      ${ridge(392, 8, 4.4, '#f3f7fd')}
+      ${[70, 520].map((x) => spruce(x, 440, 2.2, '#2a5c50')).join('')}`,
   },
   {
     id: 'nemrut', name: 'Taş Başlar', place: 'Nemrut',
     text: 'Gün batımında dev taş başlar kızıla boyanır. Dağ kekiği ve geven arıların yoldaşı.',
-    accent: '#d9762b', accent2: '#b85a1a', ink: '#4a2616',
-    svg: () => `<defs>${g('s7', '#f7a37a', '#ffe2b8')}${g('m7', '#c97b5e', '#9a5a46')}</defs>
-      <rect width="400" height="600" fill="url(#s7)"/>${sun(200, 200, 38, '#ffe0a0')}${birds(80, 120)}
-      <path d="M0 300 L140 170 L200 150 L260 170 L400 300 V600 H0z" fill="url(#m7)"/>
-      ${[[150, 300, 1], [200, 292, 1.15], [250, 300, 1]].map(([x, y, s]) => `<g transform="translate(${x} ${y}) scale(${s})" fill="#8a5240"><path d="M-16 0 V-30 Q-16 -46 0 -48 Q16 -46 16 -30 V0z"/><path d="M-14 -44 L0 -66 L14 -44z" fill="#7a4636"/><rect x="-18" y="0" width="36" height="12" fill="#7a4636"/></g>`).join('')}
-      <path d="M0 340 Q200 310 400 340 V600 H0z" fill="#b8745a"/>`,
+    accent: '#d6702a', accent2: '#b5561a', ink: '#4a2616',
+    svg: () => {
+      const head = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><rect x="-22" y="-6" width="44" height="14" rx="3" fill="#9a644c"/><path d="M-17 -6 V-36 Q-17 -54 0 -56 Q17 -54 17 -36 V-6Z" fill="#b07a5e"/><path d="M0 -56 Q17 -54 17 -36 V-6 H6 Q10 -34 0 -56Z" fill="#9a644c"/><path d="M-15 -52 L0 -78 L15 -52Z" fill="#a36d54"/></g>`;
+      return `<defs>${lg('nsk', [[0, '#f29d7d'], [0.4, '#ffc79a'], [0.6, '#ffe6c2']])}${rg('nsn', '#fff0c8', 0.95)}${lg('nmt', [[0, '#c98a6a'], [1, '#a86a4e']])}</defs>
+        <rect width="600" height="600" fill="url(#nsk)"/>${glow(300, 300, 200, 'nsn')}<circle cx="300" cy="300" r="40" fill="#fff0cc"/>
+        ${ridge(320, 16, 1.9, '#d6a183')}
+        <path d="M110 360 L250 230 Q300 214 350 230 L490 360Z" fill="url(#nmt)"/>
+        ${head(240, 372, 1.2)}${head(300, 366, 1.4)}${head(360, 372, 1.2)}
+        ${ridge(386, 10, 3.3, '#b5775a')}`;
+    },
   },
   {
     id: 'bogaz', name: 'İki Yaka', place: 'İstanbul Boğazı',
     text: 'Kubbeler, minareler, köprünün altından geçen vapurlar. Erguvanlar açınca iki yaka morarır.',
-    accent: '#3a74d0', accent2: '#2756a8', ink: '#1b2b4d',
-    svg: () => `<defs>${g('s8', '#ffd3c2', '#e9f2ff')}${g('b8', '#5e9ee0', '#3471bf')}</defs>
-      <rect width="400" height="600" fill="url(#s8)"/>${sun(330, 150, 26, '#fff0c8')}${cloud(80, 80, 0.9)}${birds(190, 110)}
-      <g fill="#7e86b5">${[[30, 230, 40], [80, 220, 30], [120, 236, 22]].map(([x, y, r]) => `<path d="M${x - r} ${y} A${r} ${r} 0 0 1 ${x + r} ${y}z"/>`).join('')}<rect x="10" y="230" width="140" height="20"/>${[18, 142].map((x) => `<rect x="${x - 2}" y="170" width="4" height="62"/><path d="M${x - 3} 172 L${x} 160 L${x + 3} 172z"/>`).join('')}</g>
-      <path d="M160 200 Q250 160 360 200" stroke="#c46b52" stroke-width="3" fill="none"/><path d="M150 205 H380" stroke="#c46b52" stroke-width="5"/><rect x="200" y="170" width="6" height="40" fill="#c46b52"/><rect x="330" y="170" width="6" height="40" fill="#c46b52"/>
-      <rect y="248" width="400" height="80" fill="url(#b8)"/>
-      <g class="dy-ferry"><path d="M60 270 h46 l-6 10 h-34z" fill="#fff"/><rect x="72" y="262" width="22" height="8" fill="#fff"/><rect x="80" y="256" width="4" height="7" fill="#e85a4a"/></g>
-      <path d="M0 320 Q120 300 240 318 T400 310 V600 H0z" fill="#9fc48a"/>
-      ${[[60, 360], [330, 350]].map(([x, y]) => `<g transform="translate(${x} ${y})"><rect x="-3" y="-30" width="6" height="30" fill="#7a5a44"/><circle cx="0" cy="-42" r="22" fill="#c27ad0"/><circle cx="-14" cy="-34" r="13" fill="#d697e0"/></g>`).join('')}`,
+    accent: '#3870cc', accent2: '#2554a4', ink: '#1b2b4d',
+    svg: () => `<defs>${lg('bsk', [[0, '#ffc4ae'], [0.45, '#ffe2d2'], [0.6, '#eaf0ff']])}${rg('bsn', '#fff2d8', 0.9)}${lg('bsea', [[0, '#7fb2e6'], [1, '#3b78c2']])}</defs>
+      <rect width="600" height="600" fill="url(#bsk)"/>${glow(450, 270, 150, 'bsn')}<circle cx="450" cy="270" r="28" fill="#fff3dc"/>
+      <g fill="#8d8bb6">
+        <rect x="40" y="290" width="230" height="20"/>
+        ${[[90, 290, 34], [150, 286, 44], [210, 292, 30]].map(([x, y, r]) => `<path d="M${x - r} ${y} A${r} ${r} 0 0 1 ${x + r} ${y}Z"/>`).join('')}
+        ${[52, 118, 186, 254].map((x) => `<rect x="${x - 3}" y="220" width="6" height="72"/><path d="M${x - 4} 222 L${x} 206 L${x + 4} 222Z"/>`).join('')}
+      </g>
+      <path d="M300 268 Q410 222 540 268" stroke="#c96d55" stroke-width="3" fill="none"/><path d="M290 274 H560" stroke="#c96d55" stroke-width="6"/><rect x="342" y="236" width="7" height="58" fill="#c96d55"/><rect x="494" y="236" width="7" height="58" fill="#c96d55"/>
+      <rect x="-10" y="308" width="620" height="82" fill="url(#bsea)"/>
+      <path d="M90 330 h70 M300 344 h100 M200 366 h60 M450 330 h60" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".35"/>
+      <g transform="translate(250 336)"><path d="M-30 0 h60 l-8 12 h-44z" fill="#fff"/><rect x="-16" y="-10" width="30" height="10" fill="#fff"/><rect x="-4" y="-18" width="6" height="8" fill="#e85a4a"/></g>
+      ${ridge(398, 10, 2.8, '#a5c78f')}
+      ${[[100, 410, 1.4], [500, 404, 1.6]].map(([x, y, s]) => roundTree(x, y, s, '#c487d4', '#d7a3e4')).join('')}`,
   },
   {
     id: 'cay', name: 'Çay Bahçeleri', place: 'Rize',
     text: 'Yamaçlarda sıra sıra çay. Yağmur hiç eksik olmaz, arılar kestane çiçeğinin peşinde.',
-    accent: '#3a9e52', accent2: '#287d3d', ink: '#183a22',
-    svg: () => `<defs>${g('s9', '#d2e6ee', '#f6fbf4')}</defs>
-      <rect width="400" height="600" fill="url(#s9)"/>${cloud(100, 70, 1)}${cloud(300, 120, 0.8)}
-      <path d="M0 220 Q120 140 240 190 T400 170 V600 H0z" fill="#7ebc78"/>
-      ${Array.from({ length: 9 }, (_, i) => `<path d="M0 ${230 + i * 30} Q${120 + (i % 2) * 30} ${200 + i * 30} 240 ${222 + i * 30} T400 ${214 + i * 30}" stroke="${i % 2 ? '#3f8d4a' : '#4e9d55'}" stroke-width="12" fill="none" stroke-linecap="round"/>`).join('')}
-      <g class="dy-rain" stroke="#ffffff" stroke-width="1.4" opacity=".6">${Array.from({ length: 30 }, (_, i) => `<path d="M${(i * 37) % 400} ${(i * 53) % 300} l-4 12"/>`).join('')}</g>`,
+    accent: '#349a4e', accent2: '#257a3a', ink: '#183a22',
+    svg: () => `<defs>${lg('csk', [[0, '#cfe3ea'], [0.55, '#f4f9f2']])}</defs>
+      <rect width="600" height="600" fill="url(#csk)"/>${cloud(160, 140, 1.4, 0.65)}${cloud(440, 170, 1.1, 0.55)}
+      ${ridge(270, 40, 0.9, '#a8cfa3', { freq: 0.6 })}${haze('ch1', 250, 320, '#ffffff', 0.55)}
+      ${Array.from({ length: 8 }, (_, i) => ridge(318 + i * 30, 26 - i * 1.5, 1.3, i % 2 ? '#5aa364' : '#6db574', { freq: 0.6 })).join('')}
+      <g>${[[470, 330], [500, 336]].map(([x, y]) => `<rect x="${x - 12}" y="${y - 14}" width="24" height="14" fill="#f6efe4"/><path d="M${x - 15} ${y - 14} L${x} ${y - 24} L${x + 15} ${y - 14}Z" fill="#c25b44"/>`).join('')}</g>
+      ${haze('ch2', 300, 360, '#ffffff', 0.3)}`,
   },
   {
     id: 'van', name: 'Göl ve Dağ', place: 'Van ve Ağrı',
     text: 'Masmavi gölün ardında karlı Ağrı Dağı. Yaz başında yaylalar rengârenk çiçeğe keser.',
-    accent: '#2b8cc4', accent2: '#1b6b9c', ink: '#163246',
-    svg: () => `<defs>${g('s10', '#a8d4f2', '#f2f9ff')}${g('l10', '#3fa2dc', '#2073b0')}</defs>
-      <rect width="400" height="600" fill="url(#s10)"/>${cloud(70, 80, 0.8)}${birds(260, 90)}
-      <path d="M40 230 L200 80 L250 120 L360 230z" fill="#8fa8c4"/><path d="M200 80 L238 116 L216 112 L200 128 L184 112 L166 114z" fill="#fff"/>
-      <rect y="228" width="400" height="70" fill="url(#l10)"/>
-      <path class="dy-shine" d="M60 250 h80 M200 262 h90 M110 280 h60" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".45"/>
-      <path d="M0 296 Q140 276 260 294 T400 290 V600 H0z" fill="#a9cf86"/>
-      ${Array.from({ length: 40 }, (_, i) => `<circle cx="${(i * 41) % 400}" cy="${320 + ((i * 29) % 200)}" r="3" fill="${['#ff6b8b', '#ffd34d', '#b98bff', '#fff'][i % 4]}"/>`).join('')}`,
+    accent: '#2a88c0', accent2: '#1b6898', ink: '#163246',
+    svg: () => `<defs>${lg('vsk', [[0, '#a6d3f3'], [0.55, '#eef8ff']])}${lg('vlk', [[0, '#69b4e6'], [1, '#2b7abd']])}${lg('vmt', [[0, '#9fb0c8'], [1, '#8297b4']])}${lg('vmd', [[0, '#b4d690'], [1, '#93bf72']])}</defs>
+      <rect width="600" height="600" fill="url(#vsk)"/>${cloud(120, 120, 1, 0.6)}
+      <path d="M90 300 L300 120 L360 160 L520 300Z" fill="url(#vmt)"/><path d="M300 120 L346 166 L320 160 L300 182 L280 162 L250 168Z" fill="#fff"/>
+      <path d="M380 300 L450 236 L520 300Z" fill="#94a7c1"/><path d="M450 236 L466 252 L452 250 L440 256Z" fill="#fff"/>
+      ${haze('vh1', 240, 304, '#ffffff', 0.45)}
+      <rect x="-10" y="300" width="620" height="76" fill="url(#vlk)"/>
+      <path d="M100 322 h110 M290 336 h120 M160 356 h70" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".35"/>
+      ${ridge(386, 12, 2.2, 'url(#vmd)')}
+      ${Array.from({ length: 30 }, (_, i) => `<circle cx="${(i * 67) % 600}" cy="${410 + ((i * 37) % 180)}" r="${3 + (i % 3)}" fill="${['#f27a92', '#ffd25a', '#b896f0', '#fff'][i % 4]}" opacity=".85"/>`).join('')}`,
   },
 ];
 
 export const diyarOf = (li) => DIYAR[Math.floor(li / 10) % DIYAR.length];
+export const diyarSVG = (d, viewBox = '0 0 600 600') => `<svg viewBox="${viewBox}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${d.svg()}</svg>`;

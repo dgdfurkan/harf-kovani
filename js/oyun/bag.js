@@ -218,34 +218,121 @@ export function drawRope(g, pts, finger, w, kind, t) {
   g.shadowBlur = 0;
 }
 
+// Arı: yarı saydam çırpan kanatlar, kehribar karın, tüylü göğüs, iri parlak göz. Sola bakar.
+const BEE_LINE = 'rgba(59,38,23,.6)';
 export const drawBee = (g, x, y, s, t, ang = 0) => {
   g.save();
   g.translate(x, y);
   g.rotate(ang);
-  const flap = Math.sin(t / 26);
-  g.globalAlpha = 0.85;
-  for (const d of [-1, 1]) {
+  const flap = Math.sin(t / 22);
+  const lw = Math.max(0.7, s * 0.07);
+  g.lineCap = 'round';
+  const wing = (bx, by, len, wid, a, alpha) => {
+    g.save();
+    g.translate(bx, by);
+    g.rotate(a);
+    g.globalAlpha = alpha;
     g.beginPath();
-    g.ellipse(d * s * 0.5, -s * 0.6, s * 0.55, s * 0.3 * (0.5 + Math.abs(flap) * 0.6), d * 0.5, 0, Math.PI * 2);
-    g.fillStyle = '#eaf6ff';
+    g.ellipse(0, -len * 0.5, wid, len * 0.5, 0, 0, Math.PI * 2);
+    g.fillStyle = '#eef8ff';
     g.fill();
-  }
-  g.globalAlpha = 1;
+    g.lineWidth = Math.max(0.6, s * 0.04);
+    g.strokeStyle = '#7fa2cc';
+    g.stroke();
+    g.beginPath();
+    g.moveTo(0, -len * 0.12);
+    g.quadraticCurveTo(wid * 0.35, -len * 0.5, 0, -len * 0.86);
+    g.stroke();
+    g.restore();
+  };
+  wing(-0.1 * s, -0.34 * s, 0.9 * s, 0.28 * s, 0.75 + flap * 0.35, 0.5);
+  // Bacaklar göğsün altından görünür
+  g.strokeStyle = '#3b2617';
+  g.lineWidth = lw;
   g.beginPath();
-  g.ellipse(0, 0, s * 0.85, s * 0.6, 0, 0, Math.PI * 2);
-  g.fillStyle = '#ffcd3c';
-  g.fill();
-  g.lineWidth = s * 0.16;
-  g.strokeStyle = INK;
+  for (const lx of [-0.5, -0.3, -0.1]) { g.moveTo(lx * s, 0.2 * s); g.lineTo((lx - 0.06) * s, 0.44 * s); }
   g.stroke();
-  g.fillStyle = INK;
-  g.fillRect(-s * 0.18, -s * 0.52, s * 0.22, s * 1.04);
-  g.fillRect(s * 0.26, -s * 0.42, s * 0.2, s * 0.84);
+  // Karın
+  const abd = () => { g.beginPath(); g.ellipse(0.24 * s, 0.05 * s, 0.62 * s, 0.47 * s, 0.12, 0, Math.PI * 2); };
+  abd();
+  const ab = g.createLinearGradient(0, -0.45 * s, 0, 0.55 * s);
+  ab.addColorStop(0, '#ffe486');
+  ab.addColorStop(0.55, '#ffbe2e');
+  ab.addColorStop(1, '#e48a1a');
+  g.fillStyle = ab;
+  g.fill();
+  g.save();
+  g.clip();
+  g.fillStyle = '#3b2617';
+  for (const sx of [0.14, 0.44]) { g.beginPath(); g.ellipse(sx * s, 0.06 * s, 0.1 * s, 0.6 * s, 0.12, 0, Math.PI * 2); g.fill(); }
   g.beginPath();
-  g.arc(-s * 0.52, -s * 0.12, s * 0.1, 0, Math.PI * 2);
+  g.ellipse(0.9 * s, 0.13 * s, 0.13 * s, 0.6 * s, 0.12, 0, Math.PI * 2);
+  g.fill();
+  g.globalAlpha = 0.5;
+  g.fillStyle = '#fff';
+  g.beginPath();
+  g.ellipse(0.12 * s, -0.24 * s, 0.32 * s, 0.09 * s, 0.1, 0, Math.PI * 2);
   g.fill();
   g.restore();
+  abd();
+  g.lineWidth = lw;
+  g.strokeStyle = BEE_LINE;
+  g.stroke();
+  g.beginPath();
+  g.moveTo(0.84 * s, 0.1 * s);
+  g.lineTo(1.02 * s, 0.17 * s);
+  g.lineTo(0.84 * s, 0.24 * s);
+  g.fillStyle = '#3b2617';
+  g.fill();
+  // Göğüs
+  const th = g.createRadialGradient(-0.42 * s, -0.12 * s, 0, -0.36 * s, -0.02 * s, 0.34 * s);
+  th.addColorStop(0, '#ffd866');
+  th.addColorStop(1, '#c47e1c');
+  g.beginPath();
+  g.arc(-0.36 * s, -0.02 * s, 0.32 * s, 0, Math.PI * 2);
+  g.fillStyle = th;
+  g.fill();
+  g.strokeStyle = BEE_LINE;
+  g.stroke();
+  // Duyargalar
+  g.strokeStyle = '#3b2617';
+  g.lineWidth = Math.max(0.6, s * 0.05);
+  g.beginPath();
+  g.moveTo(-0.84 * s, -0.18 * s);
+  g.quadraticCurveTo(-0.9 * s, -0.48 * s, -1.06 * s, -0.56 * s);
+  g.moveTo(-0.7 * s, -0.22 * s);
+  g.quadraticCurveTo(-0.72 * s, -0.56 * s, -0.86 * s, -0.68 * s);
+  g.stroke();
+  g.fillStyle = '#3b2617';
+  for (const [ax, ay] of [[-1.06, -0.56], [-0.86, -0.68]]) { g.beginPath(); g.arc(ax * s, ay * s, 0.06 * s, 0, Math.PI * 2); g.fill(); }
+  // Baş, göz, yanak
+  g.beginPath();
+  g.arc(-0.74 * s, 0.02 * s, 0.27 * s, 0, Math.PI * 2);
+  g.fillStyle = '#5c3d27';
+  g.fill();
+  g.strokeStyle = BEE_LINE;
+  g.lineWidth = lw;
+  g.stroke();
+  g.beginPath();
+  g.ellipse(-0.82 * s, -0.04 * s, 0.1 * s, 0.13 * s, 0, 0, Math.PI * 2);
+  g.fillStyle = '#120a06';
+  g.fill();
+  g.beginPath();
+  g.arc(-0.85 * s, -0.09 * s, 0.04 * s, 0, Math.PI * 2);
+  g.fillStyle = '#fff';
+  g.fill();
+  g.globalAlpha = 0.55;
+  g.beginPath();
+  g.ellipse(-0.66 * s, 0.14 * s, 0.08 * s, 0.05 * s, 0, 0, Math.PI * 2);
+  g.fillStyle = '#ff8f7a';
+  g.fill();
+  g.globalAlpha = 1;
+  wing(-0.24 * s, -0.32 * s, 1.02 * s, 0.32 * s, 0.32 + flap * 0.5, 0.7);
+  g.restore();
 };
+
+// Aynı arının SVG hali: düğmelerde ve kartlarda
+export const beeSVG = () => `<svg viewBox="-24 -22 48 40" aria-hidden="true"><g transform="scale(20)"><ellipse cx="-.1" cy="-.79" rx=".28" ry=".45" transform="rotate(43 -.1 -.34)" fill="#eef8ff" fill-opacity=".6" stroke="#7fa2cc" stroke-width=".04"/><path d="M-.5 .2l-.06.24M-.3 .2l-.06.24M-.1 .2l-.06.24" stroke="#3b2617" stroke-width=".07" stroke-linecap="round"/><defs><linearGradient id="hkbAb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe486"/><stop offset=".55" stop-color="#ffbe2e"/><stop offset="1" stop-color="#e48a1a"/></linearGradient><clipPath id="hkbCl"><ellipse cx=".24" cy=".05" rx=".62" ry=".47" transform="rotate(7 .24 .05)"/></clipPath></defs><ellipse cx=".24" cy=".05" rx=".62" ry=".47" transform="rotate(7 .24 .05)" fill="url(#hkbAb)"/><g clip-path="url(#hkbCl)" fill="#3b2617"><ellipse cx=".14" cy=".06" rx=".1" ry=".6"/><ellipse cx=".44" cy=".06" rx=".1" ry=".6"/><ellipse cx=".9" cy=".13" rx=".13" ry=".6"/><ellipse cx=".12" cy="-.24" rx=".32" ry=".09" fill="#fff" fill-opacity=".5"/></g><ellipse cx=".24" cy=".05" rx=".62" ry=".47" transform="rotate(7 .24 .05)" fill="none" stroke="rgba(59,38,23,.6)" stroke-width=".07"/><path d="M.84 .1L1.02 .17L.84 .24z" fill="#3b2617"/><circle cx="-.36" cy="-.02" r=".32" fill="#e3a234" stroke="rgba(59,38,23,.6)" stroke-width=".07"/><path d="M-.84 -.18Q-.9 -.48 -1.06 -.56M-.7 -.22Q-.72 -.56 -.86 -.68" fill="none" stroke="#3b2617" stroke-width=".05" stroke-linecap="round"/><circle cx="-1.06" cy="-.56" r=".06" fill="#3b2617"/><circle cx="-.86" cy="-.68" r=".06" fill="#3b2617"/><circle cx="-.74" cy=".02" r=".27" fill="#5c3d27" stroke="rgba(59,38,23,.6)" stroke-width=".07"/><ellipse cx="-.82" cy="-.04" rx=".1" ry=".13" fill="#120a06"/><circle cx="-.85" cy="-.09" r=".04" fill="#fff"/><ellipse cx="-.66" cy=".14" rx=".08" ry=".05" fill="#ff8f7a" fill-opacity=".55"/><ellipse cx="-.24" cy="-.83" rx=".32" ry=".51" transform="rotate(18 -.24 -.32)" fill="#eef8ff" fill-opacity=".75" stroke="#7fa2cc" stroke-width=".04"/></g></svg>`;
 
 // Zemin bir kez çizilir, sonra her karede resim olarak basılır
 export function combBackdrop(W, H, dpr, bs, col = themeColors()) {

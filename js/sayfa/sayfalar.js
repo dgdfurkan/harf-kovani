@@ -45,7 +45,7 @@ function mountRoute(root, go) {
       const locked = first > open;
       const done = Array.from({ length: 10 }, (_, i) => stars[first + i] || 0).filter(Boolean).length;
       return html`<section class="stop ${locked ? 'locked' : ''}" style="--ac:${d.accent}">
-        <div class="stop-art">${raw(`<svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice"><g transform="translate(0 -170)">${d.svg()}</g></svg>`)}<span><b>${d.name}</b><small>${s + 1}. durak · ${d.place} · ${done}/10</small></span></div>
+        <div class="stop-art">${raw(`<svg viewBox="0 200 600 260" preserveAspectRatio="xMidYMid slice">${d.svg()}</svg>`)}<span><b>${d.name}</b><small>${s + 1}. durak · ${d.place} · ${done}/10</small></span></div>
         <div class="stop-lv">${Array.from({ length: Math.min(10, CENGEL_LEVELS - first) }, (_, i) => {
           const li = first + i;
           const lk = li > open;

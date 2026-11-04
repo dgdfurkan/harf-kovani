@@ -94,7 +94,7 @@ export function mountHome(root, go) {
             <span class="mc-play">${icon('play')}</span>
           </button>
           <button class="mode-card mode-cengel" data-go="oyna/cengel/${ng}" style="--ac:${dg.accent}">
-            <span class="mc-art mc-scene">${raw(`<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><g transform="translate(0 -120)">${dg.svg()}</g></svg>`)}<i class="mc-grid">${raw('<svg viewBox="0 0 60 50"><g fill="#fff" stroke="none">' + [[0, 18], [12, 18], [24, 18], [36, 18], [24, 6], [24, 30], [24, 42], [48, 18]].map(([x, y]) => `<rect x="${x + 2}" y="${y - 4}" width="10" height="10" rx="2.6"/>`).join('') + '</g></svg>')}</i></span>
+            <span class="mc-art mc-scene">${raw(`<svg viewBox="40 170 520 290" preserveAspectRatio="xMidYMid slice">${dg.svg()}</svg>`)}<i class="mc-grid">${raw('<svg viewBox="0 0 60 50"><g fill="#fff" stroke="none">' + [[0, 18], [12, 18], [24, 18], [36, 18], [24, 6], [24, 30], [24, 42], [48, 18]].map(([x, y]) => `<rect x="${x + 2}" y="${y - 4}" width="10" height="10" rx="2.6"/>`).join('') + '</g></svg>')}</i></span>
             <span class="mc-body"><b>Çengel Bulmaca</b><small>${dg.name} · ${dg.place}</small>
               <span class="mc-bar"><u style="width:${(s.cengel.stars.filter((x) => x > 0).length / CENGEL_LEVELS) * 100}%"></u></span>
               <em>Bölüm ${ng + 1} / ${CENGEL_LEVELS}</em></span>

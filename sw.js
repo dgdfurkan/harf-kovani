@@ -1,7 +1,7 @@
 // Çevrimdışı kalkan: ilk açılışta bütün oyun dosyaları cihaza iner, sonra internet gerekmez.
 // Bu dosya tools/build.py ile üretilir, elle değiştirme.
 
-const VERSION = 'c1be7f599daa';
+const VERSION = '7e5166e33b65';
 const CACHE = `harf-kovani-${VERSION}`;
 const ASSETS = [
   "./",
